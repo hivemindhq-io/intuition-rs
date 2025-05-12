@@ -99,3 +99,17 @@ pub trait ContractClient: Send + Sync {
         contract_address: &str,
     ) -> Result<ContractInstance, ConsumerError>;
 }
+
+pub trait EventHandler {
+    async fn handle_event(
+        &self,
+        decoded_consumer_context: &DecodedConsumerContext,
+        event: &DecodedMessage,
+    ) -> Result<(), ConsumerError>;
+
+    async fn create_event(
+        &self,
+        decoded_consumer_context: &DecodedConsumerContext,
+        event: &DecodedMessage,
+    ) -> Result<(), ConsumerError>;
+}

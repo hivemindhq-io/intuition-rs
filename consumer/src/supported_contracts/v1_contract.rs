@@ -13,7 +13,7 @@ use crate::{
     error::ConsumerError,
     mode::types::{DecodedConsumerContext, get_event_processing_histogram},
     schemas::types::DecodedMessage,
-    traits::{ContractClient, EventProcessor},
+    traits::{ContractClient, EventHandler, EventProcessor},
 };
 use tracing::info;
 // Codegen from ABI file to interact with the Intuition contract.
@@ -91,9 +91,7 @@ impl EventProcessor for &EthMultiVaultV1Events {
                     .with_label_values(&["FeesTransferred"])
                     .start_timer();
                 info!("Received: {fees_data:#?}");
-                fees_data
-                    .handle_fees_transferred_creation(context, message)
-                    .await?;
+                fees_data.handle_event(context, message).await?;
                 timer.observe_duration();
             }
             EthMultiVaultV1Events::TripleCreated(triple_data) => {
