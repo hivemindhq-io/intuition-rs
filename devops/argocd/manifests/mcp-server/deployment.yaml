@@ -28,8 +28,8 @@ spec:
             cpu: "100m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: "200m"
+            memory: "256Mi"
 ---
 # Service to expose the MCP server
 apiVersion: v1
@@ -54,11 +54,17 @@ metadata:
   name: mcp-server-ingress
   namespace: default
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    kubernetes.io/ingress.class: "nginx"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: >-
+      # TODO: change to correct certificate
+      arn:aws:acm:us-west-2:064662847354:certificate/8bc44099-61f9-41a9-a2b1-4d68b739dd5b
+    external-dns.alpha.kubernetes.io/hostname: mcp-server.intuition.sh
 spec:
+  ingressClassName: alb
   rules:
-  - host: your-domain.com
+  - host: mcp-server.intuition.sh
     http:
       paths:
       - path: /
