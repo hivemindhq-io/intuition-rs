@@ -1,4 +1,37 @@
 services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest-dev
+    container_name: surrealdb
+    ports:
+      - "8069:8000"
+    volumes:
+      - surrealdb_data:/data
+    command: >
+      start
+      --log info
+      --user root
+      --pass root
+      rocksdb:/data/mydatabase.db
+    restart: unless-stopped 
+    healthcheck:
+      test: ["CMD-SHELL", 'echo "INFO FOR ROOT;" | /surreal sql --endpoint http://localhost:8000 --username root --password root']
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  surrealdb-migrations:
+    image: surrealdb/surrealdb:latest-dev
+    container_name: surrealdb-migrations
+    volumes:
+      - ./surrealdb/migration.surql:/migration.surql
+    entrypoint: /bin/sh
+    command: >
+      -c "/bin/cat /migration.surql | /surreal sql --endpoint http://surrealdb:8000 --username root --password root --namespace intuition --database intuition"
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+
+
   database:
     container_name: database
     image: timescale/timescaledb-ha:pg17.5-ts2.20.1
@@ -287,3 +320,4 @@ volumes:
   data_geth:
   contract-deployer-1-5-data:
   contract-deployer-1-0-data:
+  surrealdb_data:

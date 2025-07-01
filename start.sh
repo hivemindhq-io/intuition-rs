@@ -2,7 +2,7 @@
 source .env
 
 # Start shared services
-docker compose -f docker-compose-shared.yml up database pgai-installer vectorizer-worker sqs ipfs safe-content graphql-engine local-migrations indexer-migrations hasura-migrations prometheus -d --wait --force-recreate
+docker compose -f docker-compose-shared.yml up surrealdb surrealdb-migrations database pgai-installer vectorizer-worker sqs ipfs safe-content graphql-engine local-migrations indexer-migrations hasura-migrations prometheus -d --wait --force-recreate
 
 export INITIAL_CONTRACT_VERSION="v1"
 # First arg is indexer schema
