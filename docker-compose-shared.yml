@@ -14,8 +14,8 @@ services:
       rocksdb:/data/mydatabase.db
     restart: unless-stopped 
     healthcheck:
-      test: ["CMD-SHELL", 'echo "INFO FOR ROOT;" | /surreal sql --endpoint http://localhost:8000 --username root --password root']
-      interval: 1s
+      test: ["CMD-SHELL", '/surreal isready --conn http://localhost:8000']
+      interval: 5s
       timeout: 5s
       retries: 10
 

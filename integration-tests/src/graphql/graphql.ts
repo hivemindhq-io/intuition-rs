@@ -4522,9 +4522,9 @@ export type Query_Root = {
   share_price_change_stats_monthly: Array<Share_Price_Change_Stats_Monthly>;
   /** fetch data from the table: "share_price_change_stats_weekly" */
   share_price_change_stats_weekly: Array<Share_Price_Change_Stats_Weekly>;
-  /** fetch data from the table: "share_price_change" */
+  /** An array relationship */
   share_price_changes: Array<Share_Price_Changes>;
-  /** fetch aggregated fields from the table: "share_price_change" */
+  /** An aggregate relationship */
   share_price_changes_aggregate: Share_Price_Changes_Aggregate;
   /** fetch data from the table: "signal_stats_daily" */
   signal_stats_daily: Array<Signal_Stats_Daily>;
@@ -6124,6 +6124,17 @@ export type Share_Price_Changes_Aggregate = {
   nodes: Array<Share_Price_Changes>;
 };
 
+export type Share_Price_Changes_Aggregate_Bool_Exp = {
+  count?: InputMaybe<Share_Price_Changes_Aggregate_Bool_Exp_Count>;
+};
+
+export type Share_Price_Changes_Aggregate_Bool_Exp_Count = {
+  arguments?: InputMaybe<Array<Share_Price_Changes_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']['input']>;
+  filter?: InputMaybe<Share_Price_Changes_Bool_Exp>;
+  predicate: Int_Comparison_Exp;
+};
+
 /** aggregate fields of "share_price_change" */
 export type Share_Price_Changes_Aggregate_Fields = {
   __typename?: 'share_price_changes_aggregate_fields';
@@ -6147,6 +6158,21 @@ export type Share_Price_Changes_Aggregate_FieldsCountArgs = {
   distinct?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+/** order by aggregate values of table "share_price_change" */
+export type Share_Price_Changes_Aggregate_Order_By = {
+  avg?: InputMaybe<Share_Price_Changes_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<Share_Price_Changes_Max_Order_By>;
+  min?: InputMaybe<Share_Price_Changes_Min_Order_By>;
+  stddev?: InputMaybe<Share_Price_Changes_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<Share_Price_Changes_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<Share_Price_Changes_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<Share_Price_Changes_Sum_Order_By>;
+  var_pop?: InputMaybe<Share_Price_Changes_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<Share_Price_Changes_Var_Samp_Order_By>;
+  variance?: InputMaybe<Share_Price_Changes_Variance_Order_By>;
+};
+
 /** aggregate avg on columns */
 export type Share_Price_Changes_Avg_Fields = {
   __typename?: 'share_price_changes_avg_fields';
@@ -6158,6 +6184,18 @@ export type Share_Price_Changes_Avg_Fields = {
   term_id?: Maybe<Scalars['Float']['output']>;
   total_assets?: Maybe<Scalars['Float']['output']>;
   total_shares?: Maybe<Scalars['Float']['output']>;
+};
+
+/** order by avg() on columns of table "share_price_change" */
+export type Share_Price_Changes_Avg_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
 };
 
 /** Boolean expression to filter rows from the table "share_price_change". All fields are combined with a logical 'AND'. */
@@ -6194,6 +6232,20 @@ export type Share_Price_Changes_Max_Fields = {
   updated_at?: Maybe<Scalars['timestamptz']['output']>;
 };
 
+/** order by max() on columns of table "share_price_change" */
+export type Share_Price_Changes_Max_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+  transaction_hash?: InputMaybe<Order_By>;
+  updated_at?: InputMaybe<Order_By>;
+};
+
 /** aggregate min on columns */
 export type Share_Price_Changes_Min_Fields = {
   __typename?: 'share_price_changes_min_fields';
@@ -6207,6 +6259,20 @@ export type Share_Price_Changes_Min_Fields = {
   total_shares?: Maybe<Scalars['numeric']['output']>;
   transaction_hash?: Maybe<Scalars['String']['output']>;
   updated_at?: Maybe<Scalars['timestamptz']['output']>;
+};
+
+/** order by min() on columns of table "share_price_change" */
+export type Share_Price_Changes_Min_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+  transaction_hash?: InputMaybe<Order_By>;
+  updated_at?: InputMaybe<Order_By>;
 };
 
 /** Ordering options when selecting data from "share_price_change". */
@@ -6262,6 +6328,18 @@ export type Share_Price_Changes_Stddev_Fields = {
   total_shares?: Maybe<Scalars['Float']['output']>;
 };
 
+/** order by stddev() on columns of table "share_price_change" */
+export type Share_Price_Changes_Stddev_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+};
+
 /** aggregate stddev_pop on columns */
 export type Share_Price_Changes_Stddev_Pop_Fields = {
   __typename?: 'share_price_changes_stddev_pop_fields';
@@ -6275,6 +6353,18 @@ export type Share_Price_Changes_Stddev_Pop_Fields = {
   total_shares?: Maybe<Scalars['Float']['output']>;
 };
 
+/** order by stddev_pop() on columns of table "share_price_change" */
+export type Share_Price_Changes_Stddev_Pop_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+};
+
 /** aggregate stddev_samp on columns */
 export type Share_Price_Changes_Stddev_Samp_Fields = {
   __typename?: 'share_price_changes_stddev_samp_fields';
@@ -6286,6 +6376,18 @@ export type Share_Price_Changes_Stddev_Samp_Fields = {
   term_id?: Maybe<Scalars['Float']['output']>;
   total_assets?: Maybe<Scalars['Float']['output']>;
   total_shares?: Maybe<Scalars['Float']['output']>;
+};
+
+/** order by stddev_samp() on columns of table "share_price_change" */
+export type Share_Price_Changes_Stddev_Samp_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
 };
 
 /** Streaming cursor of the table "share_price_changes" */
@@ -6323,6 +6425,18 @@ export type Share_Price_Changes_Sum_Fields = {
   total_shares?: Maybe<Scalars['numeric']['output']>;
 };
 
+/** order by sum() on columns of table "share_price_change" */
+export type Share_Price_Changes_Sum_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+};
+
 /** aggregate var_pop on columns */
 export type Share_Price_Changes_Var_Pop_Fields = {
   __typename?: 'share_price_changes_var_pop_fields';
@@ -6334,6 +6448,18 @@ export type Share_Price_Changes_Var_Pop_Fields = {
   term_id?: Maybe<Scalars['Float']['output']>;
   total_assets?: Maybe<Scalars['Float']['output']>;
   total_shares?: Maybe<Scalars['Float']['output']>;
+};
+
+/** order by var_pop() on columns of table "share_price_change" */
+export type Share_Price_Changes_Var_Pop_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
 };
 
 /** aggregate var_samp on columns */
@@ -6349,6 +6475,18 @@ export type Share_Price_Changes_Var_Samp_Fields = {
   total_shares?: Maybe<Scalars['Float']['output']>;
 };
 
+/** order by var_samp() on columns of table "share_price_change" */
+export type Share_Price_Changes_Var_Samp_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+};
+
 /** aggregate variance on columns */
 export type Share_Price_Changes_Variance_Fields = {
   __typename?: 'share_price_changes_variance_fields';
@@ -6360,6 +6498,18 @@ export type Share_Price_Changes_Variance_Fields = {
   term_id?: Maybe<Scalars['Float']['output']>;
   total_assets?: Maybe<Scalars['Float']['output']>;
   total_shares?: Maybe<Scalars['Float']['output']>;
+};
+
+/** order by variance() on columns of table "share_price_change" */
+export type Share_Price_Changes_Variance_Order_By = {
+  block_number?: InputMaybe<Order_By>;
+  block_timestamp?: InputMaybe<Order_By>;
+  curve_id?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  share_price?: InputMaybe<Order_By>;
+  term_id?: InputMaybe<Order_By>;
+  total_assets?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
 };
 
 /** columns and relationships of "signal_stats_daily" */
@@ -7404,9 +7554,9 @@ export type Subscription_Root = {
   share_price_change_stats_weekly: Array<Share_Price_Change_Stats_Weekly>;
   /** fetch data from the table in a streaming manner: "share_price_change_stats_weekly" */
   share_price_change_stats_weekly_stream: Array<Share_Price_Change_Stats_Weekly>;
-  /** fetch data from the table: "share_price_change" */
+  /** An array relationship */
   share_price_changes: Array<Share_Price_Changes>;
-  /** fetch aggregated fields from the table: "share_price_change" */
+  /** An aggregate relationship */
   share_price_changes_aggregate: Share_Price_Changes_Aggregate;
   /** fetch data from the table in a streaming manner: "share_price_change" */
   share_price_changes_stream: Array<Share_Price_Changes>;
@@ -8548,6 +8698,10 @@ export type Terms = {
   /** An aggregate relationship */
   redemptions_aggregate: Redemptions_Aggregate;
   /** An array relationship */
+  share_price_changes: Array<Share_Price_Changes>;
+  /** An aggregate relationship */
+  share_price_changes_aggregate: Share_Price_Changes_Aggregate;
+  /** An array relationship */
   signals: Array<Signals>;
   /** An aggregate relationship */
   signals_aggregate: Signals_Aggregate;
@@ -8623,6 +8777,26 @@ export type TermsRedemptions_AggregateArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   order_by?: InputMaybe<Array<Redemptions_Order_By>>;
   where?: InputMaybe<Redemptions_Bool_Exp>;
+};
+
+
+/** columns and relationships of "term" */
+export type TermsShare_Price_ChangesArgs = {
+  distinct_on?: InputMaybe<Array<Share_Price_Changes_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  order_by?: InputMaybe<Array<Share_Price_Changes_Order_By>>;
+  where?: InputMaybe<Share_Price_Changes_Bool_Exp>;
+};
+
+
+/** columns and relationships of "term" */
+export type TermsShare_Price_Changes_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Share_Price_Changes_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  order_by?: InputMaybe<Array<Share_Price_Changes_Order_By>>;
+  where?: InputMaybe<Share_Price_Changes_Bool_Exp>;
 };
 
 
@@ -8719,6 +8893,8 @@ export type Terms_Bool_Exp = {
   positions_aggregate?: InputMaybe<Positions_Aggregate_Bool_Exp>;
   redemptions?: InputMaybe<Redemptions_Bool_Exp>;
   redemptions_aggregate?: InputMaybe<Redemptions_Aggregate_Bool_Exp>;
+  share_price_changes?: InputMaybe<Share_Price_Changes_Bool_Exp>;
+  share_price_changes_aggregate?: InputMaybe<Share_Price_Changes_Aggregate_Bool_Exp>;
   signals?: InputMaybe<Signals_Bool_Exp>;
   signals_aggregate?: InputMaybe<Signals_Aggregate_Bool_Exp>;
   total_assets?: InputMaybe<Numeric_Comparison_Exp>;
@@ -8762,6 +8938,7 @@ export type Terms_Order_By = {
   id?: InputMaybe<Order_By>;
   positions_aggregate?: InputMaybe<Positions_Aggregate_Order_By>;
   redemptions_aggregate?: InputMaybe<Redemptions_Aggregate_Order_By>;
+  share_price_changes_aggregate?: InputMaybe<Share_Price_Changes_Aggregate_Order_By>;
   signals_aggregate?: InputMaybe<Signals_Aggregate_Order_By>;
   total_assets?: InputMaybe<Order_By>;
   total_market_cap?: InputMaybe<Order_By>;
@@ -10360,6 +10537,22 @@ export type GetTransactionEventsQueryVariables = Exact<{
 
 export type GetTransactionEventsQuery = { __typename?: 'query_root', events: Array<{ __typename?: 'events', transaction_hash: string }> };
 
+export type PositionsCountSurrealQueryVariables = Exact<{
+  where?: InputMaybe<Positions_Bool_Exp>;
+}>;
+
+
+export type PositionsCountSurrealQuery = { __typename?: 'query_root', positions_aggregate: { __typename?: 'positions_aggregate', aggregate?: { __typename?: 'positions_aggregate_fields', count: number } | null } };
+
+export type PositionsSurrealQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<Positions_Bool_Exp>;
+}>;
+
+
+export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', label?: string | null, type: any, data?: string | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null } } | null } }> };
+
 export type AtomQueryVariables = Exact<{
   id: Scalars['numeric']['input'];
 }>;
@@ -10552,6 +10745,51 @@ export const GetTransactionEventsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GetTransactionEventsQuery, GetTransactionEventsQueryVariables>;
+export const PositionsCountSurrealDocument = new TypedDocumentString(`
+    query PositionsCountSurreal($where: positions_bool_exp) {
+  positions_aggregate(where: $where) {
+    aggregate {
+      count
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<PositionsCountSurrealQuery, PositionsCountSurrealQueryVariables>;
+export const PositionsSurrealDocument = new TypedDocumentString(`
+    query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
+  positions(limit: $limit, offset: $offset, where: $where) {
+    shares
+    account_id
+    term {
+      id
+      atom {
+        label
+        type
+        data
+      }
+      triple {
+        subject {
+          term_id
+          label
+          type
+          data
+        }
+        predicate {
+          term_id
+          label
+          type
+          data
+        }
+        object {
+          term_id
+          label
+          type
+          data
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<PositionsSurrealQuery, PositionsSurrealQueryVariables>;
 export const AtomDocument = new TypedDocumentString(`
     query atom($id: numeric!) {
   atom(term_id: $id) {

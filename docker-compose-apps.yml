@@ -205,6 +205,7 @@ services:
       - ETHEREUM_RPC_URL=http://geth:8545
       - GRAPHQL_API_URL=http://graphql-engine:8080/v1/graphql
       - IPFS_API_URL=http://api:3000/upload_json_to_ipfs 
+      - SURREAL_URL=http://surrealdb:8000/rpc
       - VITE_INTUITION_CONTRACT_ADDRESS=$INTUITION_CONTRACT_ADDRESS
     # depends_on:
     #   geth:
