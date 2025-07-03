@@ -10551,7 +10551,7 @@ export type PositionsSurrealQueryVariables = Exact<{
 }>;
 
 
-export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', label?: string | null, type: any, data?: string | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null } } | null } }> };
+export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } } | null } }> };
 
 export type AtomQueryVariables = Exact<{
   id: Scalars['numeric']['input'];
@@ -10762,9 +10762,21 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
     term {
       id
       atom {
+        term_id
         label
         type
         data
+        value {
+          json_object {
+            data
+          }
+          person {
+            name
+            description
+            url
+            image
+          }
+        }
       }
       triple {
         subject {
@@ -10772,6 +10784,17 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           label
           type
           data
+          value {
+            json_object {
+              data
+            }
+            person {
+              name
+              description
+              url
+              image
+            }
+          }
         }
         predicate {
           term_id
@@ -10784,6 +10807,17 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           label
           type
           data
+          value {
+            json_object {
+              data
+            }
+            person {
+              name
+              description
+              url
+              image
+            }
+          }
         }
       }
     }

@@ -11,6 +11,7 @@ DEFINE FIELD term_id ON TABLE atom TYPE string;
 DEFINE FIELD atom_type ON TABLE atom TYPE string;
 DEFINE FIELD label ON TABLE atom TYPE option<string>;
 DEFINE FIELD data ON TABLE atom TYPE option<string>;
+DEFINE FIELD value ON TABLE atom TYPE option<object>;
 
 DEFINE TABLE account SCHEMAFULL;
 

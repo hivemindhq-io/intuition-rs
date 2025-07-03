@@ -19,18 +19,27 @@ query PositionsCountSurreal($where: positions_bool_exp) {
 
 const positionsQuery = graphql(`
 query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
-  positions(
-    limit: $limit
-    offset: $offset
-    where: $where ) {
+  positions(limit: $limit, offset: $offset, where: $where) {
     shares
     account_id
     term {
       id
       atom {
+        term_id
         label
         type
         data
+        value {
+          json_object {
+            data
+          }
+          person {
+            name
+            description
+            url
+            image
+          }
+        }
       }
       triple {
         subject {
@@ -38,6 +47,17 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           label
           type
           data
+          value {
+            json_object {
+              data
+            }
+            person {
+              name
+              description
+              url
+              image
+            }
+          }
         }
         predicate {
           term_id
@@ -50,6 +70,17 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           label
           type
           data
+          value {
+            json_object {
+              data
+            }
+            person {
+              name
+              description
+              url
+              image
+            }
+          }
         }
       }
     }
@@ -67,6 +98,7 @@ export interface PositionsResult {
         label: string;
         type: string;
         data: string;
+        value?: any
       };
       triple?: {
         subject: {
@@ -74,6 +106,7 @@ export interface PositionsResult {
           label: string;
           type: string;
           data: string;
+          value?: any
         };
         predicate: {
           term_id: string;
@@ -86,6 +119,7 @@ export interface PositionsResult {
           label: string;
           type: string;
           data: string;
+          value?: any
         };
       };
     };
@@ -150,6 +184,18 @@ test('should sync all positions', async () => {
     namespace: 'intuition',
   });
 
+  const atomValueToObj = (val: any) => {
+    if (val.person !== null) {
+      return val.person
+    }
+
+    if (val.json_object !== null) {
+      return val.json_object.data
+    }
+    return {}
+
+  }
+
   const sync = async (positions: PositionsResult['positions']) => {
     for (const position of positions) {
       if (position.term.atom) {
@@ -158,6 +204,7 @@ test('should sync all positions', async () => {
           label: position.term.atom.label,
           atom_type: position.term.atom.type,
           data: position.term.atom.data,
+          value: atomValueToObj(position.term.atom.value),
         });
         // console.log(atom);
       }
@@ -168,6 +215,7 @@ test('should sync all positions', async () => {
           label: position.term.triple.subject.label,
           atom_type: position.term.triple.subject.type,
           data: position.term.triple.subject.data,
+          value: atomValueToObj(position.term.triple.subject.value),
         });
         const predicate = await db.upsert(new RecordId('atom', position.term.triple.predicate.term_id), {
           term_id: position.term.triple.predicate.term_id,
@@ -180,6 +228,7 @@ test('should sync all positions', async () => {
           label: position.term.triple.object.label,
           atom_type: position.term.triple.object.type,
           data: position.term.triple.object.data,
+          value: atomValueToObj(position.term.triple.object.value),
         });
 
         // const triple = await db.upsert(new RecordId('triple', position.term.id), {
