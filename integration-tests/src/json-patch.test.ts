@@ -24,14 +24,16 @@ suite('create person triple', () => {
     const mayaPerson = await maya.getOrCreateAtom(await pinJson(initialJson))
     await wait(mayaPerson.hash)
 
-    const patchJson =
-      [
-        { "op": "replace", "path": "/name", "value": "Maya Smith" },
-        { "op": "add", "path": "/image", "value": "https://example.com/avatar.png" },
-        { "op": "remove", "path": "/url" }
-      ]
 
-    const patchAtom = await maya.getOrCreateAtom(await pinJson(patchJson))
+    const patchAtom = await maya.getOrCreateAtom(await pinJson({
+      patch:
+        [
+          { "op": "replace", "path": "/name", "value": "Maya Smith" },
+          { "op": "add", "path": "/image", "value": "https://example.com/avatar.png" },
+          { "op": "remove", "path": "/url" }
+        ]
+    }
+    ))
 
     const triple = await maya.getCreateOrDepositOnTriple(
       mayaPerson.vaultId,
@@ -44,5 +46,28 @@ suite('create person triple', () => {
     expect(patchAtom).toBeDefined()
     expect(mayaPerson).toBeDefined()
     expect(triple.vaultId).toBeDefined()
+
+    const bob = await getIntuition(12)
+
+
+    const patchAtom2 = await bob.getOrCreateAtom(await pinJson({
+      patch:
+        [
+          { "op": "replace", "path": "/name", "value": "Maya Smithers" },
+          { "op": "add", "path": "/foo", "value": "bar" },
+        ]
+    }
+    ))
+
+    const triple2 = await bob.getCreateOrDepositOnTriple(
+      mayaPerson.vaultId,
+      patch_predicate.vaultId,
+      patchAtom2.vaultId,
+    )
+    await wait(triple2.hash)
+
+    expect(triple2.hash).toBeDefined()
+
+
   })
 })

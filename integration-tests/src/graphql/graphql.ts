@@ -9382,6 +9382,7 @@ export type Triple_Term = {
   term_id: Scalars['numeric']['output'];
   total_assets: Scalars['numeric']['output'];
   total_market_cap: Scalars['numeric']['output'];
+  total_position_count: Scalars['bigint']['output'];
   updated_at: Scalars['timestamptz']['output'];
 };
 
@@ -9396,6 +9397,7 @@ export type Triple_Term_Bool_Exp = {
   term_id?: InputMaybe<Numeric_Comparison_Exp>;
   total_assets?: InputMaybe<Numeric_Comparison_Exp>;
   total_market_cap?: InputMaybe<Numeric_Comparison_Exp>;
+  total_position_count?: InputMaybe<Bigint_Comparison_Exp>;
   updated_at?: InputMaybe<Timestamptz_Comparison_Exp>;
 };
 
@@ -9407,6 +9409,7 @@ export type Triple_Term_Order_By = {
   term_id?: InputMaybe<Order_By>;
   total_assets?: InputMaybe<Order_By>;
   total_market_cap?: InputMaybe<Order_By>;
+  total_position_count?: InputMaybe<Order_By>;
   updated_at?: InputMaybe<Order_By>;
 };
 
@@ -9420,6 +9423,8 @@ export enum Triple_Term_Select_Column {
   TotalAssets = 'total_assets',
   /** column name */
   TotalMarketCap = 'total_market_cap',
+  /** column name */
+  TotalPositionCount = 'total_position_count',
   /** column name */
   UpdatedAt = 'updated_at'
 }
@@ -9438,6 +9443,7 @@ export type Triple_Term_Stream_Cursor_Value_Input = {
   term_id?: InputMaybe<Scalars['numeric']['input']>;
   total_assets?: InputMaybe<Scalars['numeric']['input']>;
   total_market_cap?: InputMaybe<Scalars['numeric']['input']>;
+  total_position_count?: InputMaybe<Scalars['bigint']['input']>;
   updated_at?: InputMaybe<Scalars['timestamptz']['input']>;
 };
 
@@ -9575,6 +9581,8 @@ export type Triples = {
   transaction_hash: Scalars['String']['output'];
   /** An object relationship */
   triple_term?: Maybe<Triple_Term>;
+  /** An object relationship */
+  triple_vault?: Maybe<Triple_Vault>;
 };
 
 
@@ -9719,6 +9727,7 @@ export type Triples_Bool_Exp = {
   term_id?: InputMaybe<Numeric_Comparison_Exp>;
   transaction_hash?: InputMaybe<String_Comparison_Exp>;
   triple_term?: InputMaybe<Triple_Term_Bool_Exp>;
+  triple_vault?: InputMaybe<Triple_Vault_Bool_Exp>;
 };
 
 /** aggregate max on columns */
@@ -9795,6 +9804,7 @@ export type Triples_Order_By = {
   term_id?: InputMaybe<Order_By>;
   transaction_hash?: InputMaybe<Order_By>;
   triple_term?: InputMaybe<Triple_Term_Order_By>;
+  triple_vault?: InputMaybe<Triple_Vault_Order_By>;
 };
 
 /** select columns of table "triple" */
@@ -10551,7 +10561,7 @@ export type PositionsSurrealQueryVariables = Exact<{
 }>;
 
 
-export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } } | null } }> };
+export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } } | null } }> };
 
 export type AtomQueryVariables = Exact<{
   id: Scalars['numeric']['input'];
@@ -10767,6 +10777,7 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
         type
         data
         value {
+          id
           json_object {
             data
           }
@@ -10785,6 +10796,7 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           type
           data
           value {
+            id
             json_object {
               data
             }
@@ -10808,6 +10820,7 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           type
           data
           value {
+            id
             json_object {
               data
             }

@@ -30,6 +30,7 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
         type
         data
         value {
+          id
           json_object {
             data
           }
@@ -48,6 +49,7 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           type
           data
           value {
+            id
             json_object {
               data
             }
@@ -71,6 +73,7 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           type
           data
           value {
+            id
             json_object {
               data
             }
@@ -184,16 +187,22 @@ test('should sync all positions', async () => {
     namespace: 'intuition',
   });
 
-  const atomValueToObj = (val: any) => {
+  const atomValueToObj = async (val: any) => {
+    if (!val || (val.json_object === null && val.person === null)) return undefined
+
+    let obj = {}
+
+
     if (val.person !== null) {
-      return val.person
+      obj = val.person
     }
 
     if (val.json_object !== null) {
-      return val.json_object.data
+      obj = val.json_object.data
     }
-    return {}
-
+    console.log({ obj, val })
+    const res = await db.upsert(new RecordId('atom_value', val.id), obj)
+    return res.id
   }
 
   const sync = async (positions: PositionsResult['positions']) => {
@@ -204,18 +213,19 @@ test('should sync all positions', async () => {
           label: position.term.atom.label,
           atom_type: position.term.atom.type,
           data: position.term.atom.data,
-          value: atomValueToObj(position.term.atom.value),
+          atom_value: await atomValueToObj(position.term.atom.value),
         });
         // console.log(atom);
       }
       if (position.term.triple) {
         // upsert subject, predicate, object
+
         const subject = await db.upsert(new RecordId('atom', position.term.triple.subject.term_id), {
           term_id: position.term.triple.subject.term_id,
           label: position.term.triple.subject.label,
           atom_type: position.term.triple.subject.type,
           data: position.term.triple.subject.data,
-          value: atomValueToObj(position.term.triple.subject.value),
+          atom_value: await atomValueToObj(position.term.triple.subject.value),
         });
         const predicate = await db.upsert(new RecordId('atom', position.term.triple.predicate.term_id), {
           term_id: position.term.triple.predicate.term_id,
@@ -228,7 +238,7 @@ test('should sync all positions', async () => {
           label: position.term.triple.object.label,
           atom_type: position.term.triple.object.type,
           data: position.term.triple.object.data,
-          value: atomValueToObj(position.term.triple.object.value),
+          atom_value: await atomValueToObj(position.term.triple.object.value),
         });
 
         // const triple = await db.upsert(new RecordId('triple', position.term.id), {
