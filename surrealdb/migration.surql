@@ -27,29 +27,14 @@ DEFINE FIELD atom_id ON TABLE account TYPE option<record<atom>>;
 DEFINE FIELD created_at ON TABLE account TYPE datetime DEFAULT time::now();
 
 DEFINE TABLE triple SCHEMAFULL TYPE RELATION;
+DEFINE FIELD label ON TABLE triple TYPE string;
 DEFINE FIELD predicate ON TABLE triple TYPE record<atom>;
 
-DEFINE FUNCTION OVERWRITE fn::get_patch_predicate_id() {
-  let $res = select id from atom where data='json_patch';
-  return $res[0].id;
-};
 
-DEFINE FUNCTION OVERWRITE fn::get_change_operations($atom_id: record<atom>) {
-    return select out.atom_value.patch as operations 
-    from triple 
-    where 
-      in = $atom_id 
-      and predicate.id = fn::get_patch_predicate_id();
-};
+DEFINE TABLE node SCHEMAFULL;
+DEFINE FIELD atom ON TABLE node TYPE record<atom>;
+DEFINE FIELD node_value ON TABLE node TYPE string | object;
 
-DEFINE FUNCTION OVERWRITE fn::interpreted_atom_value($atom_id: record<atom>) {
-    
-    let $values = select atom_value.* from atom where id = $atom_id;
-    let $original = $values[0].atom_value;
+DEFINE TABLE edge SCHEMAFULL TYPE RELATION;
 
-    let $operations = fn::get_change_operations($atom_id);
 
-    let $all_ops = array::reduce($operations, |$one, $two| $one.operations.concat($two.operations) );
-
-    return value::patch($original, $all_ops);
-};

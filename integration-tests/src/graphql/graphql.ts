@@ -4568,14 +4568,14 @@ export type Query_Root = {
   things_aggregate: Things_Aggregate;
   /** fetch data from the table: "triple" using primary key columns */
   triple?: Maybe<Triples>;
-  /** fetch data from the table: "triple_term" */
-  triple_term: Array<Triple_Term>;
   /** fetch data from the table: "triple_term" using primary key columns */
-  triple_term_by_pk?: Maybe<Triple_Term>;
-  /** fetch data from the table: "triple_vault" */
-  triple_vault: Array<Triple_Vault>;
+  triple_term?: Maybe<Triple_Term>;
+  /** fetch data from the table: "triple_term" */
+  triple_terms: Array<Triple_Term>;
   /** fetch data from the table: "triple_vault" using primary key columns */
-  triple_vault_by_pk?: Maybe<Triple_Vault>;
+  triple_vault?: Maybe<Triple_Vault>;
+  /** fetch data from the table: "triple_vault" */
+  triple_vaults: Array<Triple_Vault>;
   /** An array relationship */
   triples: Array<Triples>;
   /** An aggregate relationship */
@@ -5282,6 +5282,11 @@ export type Query_RootTripleArgs = {
 
 
 export type Query_RootTriple_TermArgs = {
+  term_id: Scalars['numeric']['input'];
+};
+
+
+export type Query_RootTriple_TermsArgs = {
   distinct_on?: InputMaybe<Array<Triple_Term_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -5290,23 +5295,18 @@ export type Query_RootTriple_TermArgs = {
 };
 
 
-export type Query_RootTriple_Term_By_PkArgs = {
+export type Query_RootTriple_VaultArgs = {
+  curve_id: Scalars['numeric']['input'];
   term_id: Scalars['numeric']['input'];
 };
 
 
-export type Query_RootTriple_VaultArgs = {
+export type Query_RootTriple_VaultsArgs = {
   distinct_on?: InputMaybe<Array<Triple_Vault_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   order_by?: InputMaybe<Array<Triple_Vault_Order_By>>;
   where?: InputMaybe<Triple_Vault_Bool_Exp>;
-};
-
-
-export type Query_RootTriple_Vault_By_PkArgs = {
-  curve_id: Scalars['numeric']['input'];
-  term_id: Scalars['numeric']['input'];
 };
 
 
@@ -7620,18 +7620,18 @@ export type Subscription_Root = {
   things_stream: Array<Things>;
   /** fetch data from the table: "triple" using primary key columns */
   triple?: Maybe<Triples>;
-  /** fetch data from the table: "triple_term" */
-  triple_term: Array<Triple_Term>;
   /** fetch data from the table: "triple_term" using primary key columns */
-  triple_term_by_pk?: Maybe<Triple_Term>;
+  triple_term?: Maybe<Triple_Term>;
   /** fetch data from the table in a streaming manner: "triple_term" */
   triple_term_stream: Array<Triple_Term>;
-  /** fetch data from the table: "triple_vault" */
-  triple_vault: Array<Triple_Vault>;
+  /** fetch data from the table: "triple_term" */
+  triple_terms: Array<Triple_Term>;
   /** fetch data from the table: "triple_vault" using primary key columns */
-  triple_vault_by_pk?: Maybe<Triple_Vault>;
+  triple_vault?: Maybe<Triple_Vault>;
   /** fetch data from the table in a streaming manner: "triple_vault" */
   triple_vault_stream: Array<Triple_Vault>;
+  /** fetch data from the table: "triple_vault" */
+  triple_vaults: Array<Triple_Vault>;
   /** An array relationship */
   triples: Array<Triples>;
   /** An aggregate relationship */
@@ -8566,15 +8566,6 @@ export type Subscription_RootTripleArgs = {
 
 
 export type Subscription_RootTriple_TermArgs = {
-  distinct_on?: InputMaybe<Array<Triple_Term_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  order_by?: InputMaybe<Array<Triple_Term_Order_By>>;
-  where?: InputMaybe<Triple_Term_Bool_Exp>;
-};
-
-
-export type Subscription_RootTriple_Term_By_PkArgs = {
   term_id: Scalars['numeric']['input'];
 };
 
@@ -8586,16 +8577,16 @@ export type Subscription_RootTriple_Term_StreamArgs = {
 };
 
 
-export type Subscription_RootTriple_VaultArgs = {
-  distinct_on?: InputMaybe<Array<Triple_Vault_Select_Column>>;
+export type Subscription_RootTriple_TermsArgs = {
+  distinct_on?: InputMaybe<Array<Triple_Term_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
-  order_by?: InputMaybe<Array<Triple_Vault_Order_By>>;
-  where?: InputMaybe<Triple_Vault_Bool_Exp>;
+  order_by?: InputMaybe<Array<Triple_Term_Order_By>>;
+  where?: InputMaybe<Triple_Term_Bool_Exp>;
 };
 
 
-export type Subscription_RootTriple_Vault_By_PkArgs = {
+export type Subscription_RootTriple_VaultArgs = {
   curve_id: Scalars['numeric']['input'];
   term_id: Scalars['numeric']['input'];
 };
@@ -8604,6 +8595,15 @@ export type Subscription_RootTriple_Vault_By_PkArgs = {
 export type Subscription_RootTriple_Vault_StreamArgs = {
   batch_size: Scalars['Int']['input'];
   cursor: Array<InputMaybe<Triple_Vault_Stream_Cursor_Input>>;
+  where?: InputMaybe<Triple_Vault_Bool_Exp>;
+};
+
+
+export type Subscription_RootTriple_VaultsArgs = {
+  distinct_on?: InputMaybe<Array<Triple_Vault_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  order_by?: InputMaybe<Array<Triple_Vault_Order_By>>;
   where?: InputMaybe<Triple_Vault_Bool_Exp>;
 };
 
@@ -10561,7 +10561,7 @@ export type PositionsSurrealQueryVariables = Exact<{
 }>;
 
 
-export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', id: any, json_object?: { __typename?: 'json_objects', data: any } | null, person?: { __typename?: 'persons', name?: string | null, description?: string | null, url?: string | null, image?: string | null } | null } | null } } | null } }> };
+export type PositionsSurrealQuery = { __typename?: 'query_root', positions: Array<{ __typename?: 'positions', shares: any, account_id: string, term: { __typename?: 'terms', id: any, atom?: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null } | null } | null, triple?: { __typename?: 'triples', subject: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null } | null }, predicate: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null }, object: { __typename?: 'atoms', term_id: any, label?: string | null, type: any, data?: string | null, value?: { __typename?: 'atom_values', json_object?: { __typename?: 'json_objects', data: any } | null } | null } } | null } }> };
 
 export type AtomQueryVariables = Exact<{
   id: Scalars['numeric']['input'];
@@ -10777,15 +10777,8 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
         type
         data
         value {
-          id
           json_object {
             data
-          }
-          person {
-            name
-            description
-            url
-            image
           }
         }
       }
@@ -10796,15 +10789,8 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           type
           data
           value {
-            id
             json_object {
               data
-            }
-            person {
-              name
-              description
-              url
-              image
             }
           }
         }
@@ -10820,15 +10806,8 @@ export const PositionsSurrealDocument = new TypedDocumentString(`
           type
           data
           value {
-            id
             json_object {
               data
-            }
-            person {
-              name
-              description
-              url
-              image
             }
           }
         }

@@ -30,15 +30,8 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
         type
         data
         value {
-          id
           json_object {
             data
-          }
-          person {
-            name
-            description
-            url
-            image
           }
         }
       }
@@ -49,15 +42,8 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           type
           data
           value {
-            id
             json_object {
               data
-            }
-            person {
-              name
-              description
-              url
-              image
             }
           }
         }
@@ -73,16 +59,10 @@ query PositionsSurreal($limit: Int, $offset: Int, $where: positions_bool_exp) {
           type
           data
           value {
-            id
             json_object {
               data
             }
-            person {
-              name
-              description
-              url
-              image
-            }
+
           }
         }
       }
@@ -187,22 +167,41 @@ test('should sync all positions', async () => {
     namespace: 'intuition',
   });
 
-  const atomValueToObj = async (val: any) => {
-    if (!val || (val.json_object === null && val.person === null)) return undefined
+  const atomValueToObj = async (val: any, id: string) => {
+    if (!val || (val.json_object === null)) return undefined
 
     let obj = {}
-
-
-    if (val.person !== null) {
-      obj = val.person
-    }
 
     if (val.json_object !== null) {
       obj = val.json_object.data
     }
-    console.log({ obj, val })
-    const res = await db.upsert(new RecordId('atom_value', val.id), obj)
+    const res = await db.upsert(new RecordId('atom_value', id), obj)
     return res.id
+  }
+
+  const createNodesAndEdges = async (val: any, id: string) => {
+    if (!val || (val.json_object === null)) return undefined
+
+    let obj = {}
+
+    if (val.json_object !== null) {
+      obj = val.json_object.data
+    }
+
+    for (const key in Object.keys(obj)) {
+      const node = await db.upsert('node', {
+        node_value: obj[key],
+        atom: new RecordId('atom', id)
+      })
+      await db.query(`RELATE atom:\`${position.term.triple.subject.term_id}\` -> triple:\`${position.term.id}\` -> atom:\`${position.term.triple.object.term_id}\`
+          CONTENT {
+           predicate: atom:\`${position.term.triple.predicate.term_id}\`,
+           label: '${position.term.triple.predicate.label}'
+
+
+          }`);
+    }
+
   }
 
   const sync = async (positions: PositionsResult['positions']) => {
@@ -213,7 +212,7 @@ test('should sync all positions', async () => {
           label: position.term.atom.label,
           atom_type: position.term.atom.type,
           data: position.term.atom.data,
-          atom_value: await atomValueToObj(position.term.atom.value),
+          atom_value: await atomValueToObj(position.term.atom.value, position.term.id),
         });
         // console.log(atom);
       }
@@ -225,7 +224,7 @@ test('should sync all positions', async () => {
           label: position.term.triple.subject.label,
           atom_type: position.term.triple.subject.type,
           data: position.term.triple.subject.data,
-          atom_value: await atomValueToObj(position.term.triple.subject.value),
+          atom_value: await atomValueToObj(position.term.triple.subject.value, position.term.id),
         });
         const predicate = await db.upsert(new RecordId('atom', position.term.triple.predicate.term_id), {
           term_id: position.term.triple.predicate.term_id,
@@ -238,7 +237,7 @@ test('should sync all positions', async () => {
           label: position.term.triple.object.label,
           atom_type: position.term.triple.object.type,
           data: position.term.triple.object.data,
-          atom_value: await atomValueToObj(position.term.triple.object.value),
+          atom_value: await atomValueToObj(position.term.triple.object.value, position.term.id),
         });
 
         // const triple = await db.upsert(new RecordId('triple', position.term.id), {
@@ -254,9 +253,13 @@ test('should sync all positions', async () => {
           // await db.query(`UPDATE triple:\`${position.term.id}\` SET holders += '${position.account_id}'`);
         } else {
           // create the relation
+          console.log('aaaaaa')
           await db.query(`RELATE atom:\`${position.term.triple.subject.term_id}\` -> triple:\`${position.term.id}\` -> atom:\`${position.term.triple.object.term_id}\`
           CONTENT {
-            predicate: atom:\`${position.term.triple.predicate.term_id}\`
+           predicate: atom:\`${position.term.triple.predicate.term_id}\`,
+           label: '${position.term.triple.predicate.label}'
+
+
           }`);
         }
 
