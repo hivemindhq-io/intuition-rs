@@ -51,6 +51,16 @@ impl AtomMetadata {
         }
     }
 
+    /// Creates a new atom metadata for an item list
+    pub fn item_list(name: String) -> Self {
+        Self {
+            label: name,
+            emoji: "📋".to_string(),
+            atom_type: "ItemList".to_string(),
+            image: None,
+        }
+    }
+
     /// Creates a new atom metadata for a byte object
     pub fn byte_object(image: Option<String>) -> Self {
         Self {

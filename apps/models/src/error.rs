@@ -16,6 +16,8 @@ pub enum ModelError {
     FailedLogInsertError(String),
     #[error("Failed to upsert data for initialize: {0}")]
     InitializeUpsertError(String),
+    #[error("Failed to upsert data for item list: {0}")]
+    ItemListUpsertError(String),
     #[error("Failed to upsert data for json object: {0}")]
     JsonObjectUpsertError(String),
     #[error("Failed to upsert data for organization: {0}")]

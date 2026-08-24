@@ -9,6 +9,7 @@ use models::{
     atom_value::AtomValue,
     book::Book,
     byte_object::ByteObject,
+    item_list::ItemList,
     json_object::JsonObject,
     organization::Organization,
     person::Person,
@@ -118,6 +119,13 @@ async fn try_to_resolve_schema_org_properties(
                         .await?;
                     create_book_atom_value(atom, &book, consumer_context).await?;
                     Ok(AtomMetadata::book(book.name.unwrap_or_default()))
+                }
+                AtomType::ItemList => {
+                    let item_list = create_item_list_from_obj(atom, obj)
+                        .upsert(consumer_context.backend_schema(), consumer_context.pool())
+                        .await?;
+                    create_item_list_atom_value(atom, &item_list, consumer_context).await?;
+                    Ok(AtomMetadata::item_list(item_list.name.unwrap_or_default()))
                 }
                 _ => {
                     warn!("Unsupported schema.org type: {}", obj_type);
@@ -295,6 +303,25 @@ pub fn create_book_from_obj(atom: &Atom, obj: &Value) -> Book {
             obj.get("url")
                 .and_then(|url| url.as_str())
                 .map(|string_url| string_url.to_string())
+                .unwrap_or_default(),
+        )
+        .build()
+}
+
+/// Creates an ItemList from a schema.org object
+pub fn create_item_list_from_obj(atom: &Atom, obj: &Value) -> ItemList {
+    ItemList::builder()
+        .id(atom.term_id.clone())
+        .name(
+            obj.get("name")
+                .and_then(|name| name.as_str())
+                .map(|string_name| string_name.to_string())
+                .unwrap_or_default(),
+        )
+        .description(
+            obj.get("description")
+                .and_then(|description| description.as_str())
+                .map(|string_description| string_description.to_string())
                 .unwrap_or_default(),
         )
         .build()
@@ -585,6 +612,37 @@ pub async fn create_book_atom_value(
         AtomValue::builder()
             .id(atom.term_id.clone())
             .book_id(book.id.clone())
+            .build()
+            .upsert(consumer_context.backend_schema(), consumer_context.pool())
+            .await?;
+    }
+    Ok(())
+}
+
+/// Creates an atom value for an item list
+pub async fn create_item_list_atom_value(
+    atom: &Atom,
+    item_list: &ItemList,
+    consumer_context: &impl AtomUpdater,
+) -> Result<(), ConsumerError> {
+    // We need to check if the atom value already exists
+    if let Some(mut atom_value) = AtomValue::find_by_id(
+        atom.term_id.clone(),
+        consumer_context.backend_schema(),
+        consumer_context.pool(),
+    )
+    .await?
+    {
+        // If the atom value already exists, we need to update it
+        atom_value.item_list_id = Some(item_list.id.clone());
+        atom_value
+            .upsert(consumer_context.backend_schema(), consumer_context.pool())
+            .await?;
+    } else {
+        // If the atom value does not exist, we need to create it
+        AtomValue::builder()
+            .id(atom.term_id.clone())
+            .item_list_id(item_list.id.clone())
             .build()
             .upsert(consumer_context.backend_schema(), consumer_context.pool())
             .await?;

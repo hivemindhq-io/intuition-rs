@@ -48,6 +48,7 @@ pub enum AtomType {
     Caip10,
     Caip22,
     FollowAction,
+    ItemList,
     JsonObject,
     Keywords,
     LikeAction,

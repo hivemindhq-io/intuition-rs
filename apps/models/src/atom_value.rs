@@ -15,6 +15,7 @@ pub struct AtomValue {
     pub person_id: Option<FixedBytesWrapper>,
     pub organization_id: Option<FixedBytesWrapper>,
     pub book_id: Option<FixedBytesWrapper>,
+    pub item_list_id: Option<FixedBytesWrapper>,
     pub json_object_id: Option<FixedBytesWrapper>,
     pub text_object_id: Option<FixedBytesWrapper>,
     pub byte_object_id: Option<FixedBytesWrapper>,
@@ -32,14 +33,15 @@ impl SimpleCrud<FixedBytesWrapper> for AtomValue {
     {
         let query = format!(
             r#"
-            INSERT INTO {}.atom_value (id, account_id, thing_id, person_id, organization_id, book_id, json_object_id, text_object_id, byte_object_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO {}.atom_value (id, account_id, thing_id, person_id, organization_id, book_id, item_list_id, json_object_id, text_object_id, byte_object_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO UPDATE SET
                 account_id = EXCLUDED.account_id,
                 thing_id = EXCLUDED.thing_id,
                 person_id = EXCLUDED.person_id,
                 organization_id = EXCLUDED.organization_id,
                 book_id = EXCLUDED.book_id,
+                item_list_id = EXCLUDED.item_list_id,
                 json_object_id = EXCLUDED.json_object_id,
                 text_object_id = EXCLUDED.text_object_id,
                 byte_object_id = EXCLUDED.byte_object_id
@@ -50,6 +52,7 @@ impl SimpleCrud<FixedBytesWrapper> for AtomValue {
                 person_id,
                 organization_id,
                 book_id,
+                item_list_id,
                 json_object_id,
                 text_object_id,
                 byte_object_id
@@ -64,6 +67,7 @@ impl SimpleCrud<FixedBytesWrapper> for AtomValue {
             .bind(self.person_id.as_ref())
             .bind(self.organization_id.as_ref())
             .bind(self.book_id.as_ref())
+            .bind(self.item_list_id.as_ref())
             .bind(self.json_object_id.as_ref())
             .bind(self.text_object_id.as_ref())
             .bind(self.byte_object_id.as_ref())
@@ -90,6 +94,7 @@ impl SimpleCrud<FixedBytesWrapper> for AtomValue {
                 person_id, 
                 organization_id, 
                 book_id,
+                item_list_id,
                 caip10_id,
                 json_object_id,
                 text_object_id,

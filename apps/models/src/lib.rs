@@ -13,6 +13,7 @@ pub mod failed_log;
 pub mod fee_transfer;
 pub mod histocrawler;
 pub mod initialize;
+pub mod item_list;
 pub mod json_object;
 pub mod organization;
 pub mod person;

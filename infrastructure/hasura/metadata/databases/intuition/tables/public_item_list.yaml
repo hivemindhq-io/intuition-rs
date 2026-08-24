@@ -1,0 +1,40 @@
+table:
+  name: item_list
+  schema: public
+configuration:
+  column_config: {}
+  custom_column_names: {}
+  custom_name: item_lists
+  custom_root_fields:
+    select_by_pk: item_list
+object_relationships:
+  - name: atom
+    using:
+      manual_configuration:
+        column_mapping:
+          id: term_id
+        insertion_order: null
+        remote_table:
+          name: atom
+          schema: public
+select_permissions:
+  - role: anonymous
+    permission:
+      columns:
+        - id
+        - description
+        - name
+      filter: {}
+      limit: 250
+      allow_aggregations: true
+    comment: ""
+  - role: frontend
+    permission:
+      columns:
+        - id
+        - description
+        - name
+      filter: {}
+      limit: 250
+      allow_aggregations: true
+    comment: ""

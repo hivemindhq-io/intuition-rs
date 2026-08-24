@@ -11,6 +11,7 @@
 - "!include public_event.yaml"
 - "!include public_fee_transfer.yaml"
 - "!include public_json_object.yaml"
+- "!include public_item_list.yaml"
 - "!include public_organization.yaml"
 - "!include public_person.yaml"
 - "!include public_pnl_leaderboard_entry.yaml"
