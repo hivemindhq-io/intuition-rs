@@ -2,9 +2,18 @@ services:
 
   
   resolver_consumer:
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./consumer --mode resolver
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "resolver"]
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       CONSUMER_TYPE: 'redis_streams'
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       ENS_CONTRACT_ADDRESS: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e'
@@ -16,7 +25,8 @@ services:
       PINATA_GATEWAY_TOKEN: $PINATA_GATEWAY_TOKEN
       PG_MIN_CONNECTIONS: '5'
       RESOLVER_STREAM: 'resolver_stream'
-      RPC_URL_BASE: "http://prod-rpc-proxy:3008/31337/proxy"
+      # Intuition mainnet (1155). Override to 31337 only for local anvil indexing.
+      RPC_URL_BASE: "http://prod-rpc-proxy:3008/1155/proxy"
       RPC_URL_MAINNET: "http://prod-rpc-proxy:3008/1/proxy"
       RUST_LOG: 'info'
       BACKEND_SCHEMA: 'public'
@@ -40,9 +50,18 @@ services:
 
   
   ipfs_upload_consumer:
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./consumer --mode ipfs-upload
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "ipfs-upload"]
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       CONSUMER_TYPE: 'redis_streams'
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       IMAGE_GUARD_URL: 'http://api:3000'
@@ -63,14 +82,24 @@ services:
     
   decoded_consumer:
     container_name: decoded_consumer
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./consumer --mode decoded
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "decoded"]
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       CONSUMER_TYPE: 'redis_hybrid'
       INDEXER_DATABASE_URL: "postgres://postgres:postgres@database:5435/storage"
       INDEXER_SCHEMA: $INDEXER_SCHEMA
       ENVIRONMENT_NAME: "local_development"
-      THREADS: '5'
+      # Keep concurrency low against the public Intuition RPC
+      THREADS: '2'
       INITIAL_CONTRACT_VERSION: $INITIAL_CONTRACT_VERSION
       CONSUMER_METRICS_API_PORT: '3002'
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
@@ -79,7 +108,8 @@ services:
       LOCALSTACK_URL: 'http://redis:6379'
       PG_MIN_CONNECTIONS: '20'
       RESOLVER_STREAM: 'resolver_stream'
-      RPC_URL_BASE: "http://prod-rpc-proxy:3008/31337/proxy"
+      # Intuition mainnet (1155). Override to 31337 only for local anvil indexing.
+      RPC_URL_BASE: "http://prod-rpc-proxy:3008/1155/proxy"
       RUST_LOG: 'info'
       BACKEND_SCHEMA: 'public'
       REDIS_URL: 'redis://redis:6379'
@@ -93,9 +123,14 @@ services:
     
   api:
     container_name: api
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./image-guard
+    image: ghcr.io/0xintuition/image-guard:2.0.21
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       CLASSIFICATION_API_PORT: '3000'
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       HF_TOKEN: ''
@@ -107,16 +142,20 @@ services:
       BE_SCHEMA: 'public'
       IMAGE_API_SCHEMA: 'cached_images'
       INDEXER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
-      # FLAG_LOCAL_WITH_DB_ONLY: $FLAG_LOCAL_WITH_DB_ONLY
-      # FLAG_HF_CLASSIFICATION: $FLAG_HF_CLASSIFICATION 
     ports:
-      - 3000:3000
+      - 3005:3000
+    restart: always
     
   prod-rpc-proxy:
     container_name: prod-rpc-proxy
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./rpc-proxy
+    image: ghcr.io/0xintuition/rpc-proxy:3.0.1
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       PROXY_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       PROXY_API_PORT: '3008'
       PROXY_SCHEMA: "rpc_proxy"
@@ -137,9 +176,14 @@ services:
 
   chart-api:
     container_name: chart-api
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./chart-api
+    image: ghcr.io/0xintuition/chart-api:0.9.97
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       CHART_API_PORT: '3010'
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       REDIS_URL: 'redis://redis:6379'
@@ -150,12 +194,33 @@ services:
 
   histocrawler:
     container_name: histocrawler
-    image: ghcr.io/0xintuition/apps:latest
-    command: ./histocrawler
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: histocrawler:local-backoff
+    build:
+      context: ..
+      dockerfile: apps/histocrawler/Dockerfile
+    # Avoid tight Docker crash-loops when upstream RPC is briefly unreachable.
+    # Built from local apps/histocrawler with process-level backoff.
+    restart: on-failure:30
     environment:
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
       HISTOCRAWLER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       INDEXER_SCHEMA: $INDEXER_SCHEMA
       RUST_LOG: 'info'
+      # Mainnet activity is concentrated in roughly the first 300k blocks; the
+      # millions of blocks after that are almost entirely empty, so a small batch
+      # cap turns the backfill into weeks of empty round-trips. Adaptive batching
+      # shrinks these again on dense ranges, and halves on oversized responses.
+      HISTOCRAWLER_MAX_BATCH_SIZE: '5000'
+      HISTOCRAWLER_MAX_LOGS_PER_REQUEST: '20000'
+      HISTOCRAWLER_INTER_BATCH_DELAY_MS: '500'
+      HISTOCRAWLER_TIMESTAMP_DELAY_MS: '20'
     depends_on:
       prod-rpc-proxy:
         condition: service_started
@@ -170,15 +235,6 @@ services:
       - GRAPHQL_API_URL=http://graphql-engine:8080/v1/graphql
       - IPFS_API_URL=http://api:3000/upload_json_to_ipfs
       - VITE_INTUITION_CONTRACT_ADDRESS=$INTUITION_CONTRACT_ADDRESS
-    # depends_on:
-    #   reth:
-    #     condition: service_healthy
-    #   graphql-engine:
-    #     condition: service_healthy
-    #   consumer-api:
-    #     condition: service_started
-
-
 
 networks:
   intuition-be:

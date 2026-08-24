@@ -50,10 +50,23 @@ args = [
     "ipfs-upload"
 ]
 
-# Start the full system using the start script
+# Start the full system using the start script.
+# Prefer: cargo make start-trust-mainnet
+# (start-local still defaults to local anvil for integration tests)
 [tasks.start-local]
 command = "./scripts/start.sh"
 args = ["local"]
+
+[tasks.start-trust-mainnet]
+command = "./scripts/start.sh"
+args = ["trust_mainnet"]
+
+# Separate TESTNET stack (own compose project/ports/DB) — safe beside mainnet
+[tasks.start-trust-testnet]
+command = "./scripts/start-testnet.sh"
+
+[tasks.stop-trust-testnet]
+command = "./scripts/stop-testnet.sh"
 
 # Stop the full system using the stop script
 [tasks.stop]

@@ -36,12 +36,48 @@ else
 fi
 
 # Start shared services
-docker compose -p intuition -f docker/docker-compose-shared.yml up database pgai-installer vectorizer-worker redis redis-setup ipfs safe-content graphql-engine indexer-migrations hasura-migrations prometheus grafana -d --wait --force-recreate
+# NOTE: do NOT pass --remove-orphans on the apps compose later — shared services
+# look like orphans to that file and will get torn down.
+docker compose -p intuition -f docker/docker-compose-shared.yml up database pgai-installer vectorizer-worker redis redis-setup ipfs safe-content graphql-engine indexer-migrations prometheus grafana -d --wait --force-recreate
+
+# Apply Hasura migrations from the local repo (published hasura-migrations image
+# is months stale and lacks --no-transaction for Timescale continuous aggs).
+if command -v hasura >/dev/null 2>&1; then
+  echo "Applying local Hasura migrations..."
+  (
+    cd "$PROJECT_ROOT/infrastructure/hasura"
+    hasura metadata apply --endpoint http://localhost:8080 --admin-secret myadminsecretkey || true
+    hasura migrate apply --database-name intuition --endpoint http://localhost:8080 --admin-secret myadminsecretkey --no-transaction
+    hasura metadata apply --endpoint http://localhost:8080 --admin-secret myadminsecretkey || true
+  )
+else
+  echo "Warning: hasura CLI not found; schema may be incomplete. Install with:"
+  echo "  curl -L https://github.com/hasura/graphql-engine/raw/stable/cli/get.sh | VERSION=v2.48.0 bash"
+fi
 
 export INITIAL_CONTRACT_VERSION="v2"
-# First arg is indexer schema
+# First arg is indexer schema; fall back to .env INDEXER_SCHEMA or trust_mainnet
 INDEXER_SCHEMA="$1"
-CONTRACT_ADDRESS=$(docker compose -p intuition -f docker/docker-compose-shared.yml exec database psql -U postgres -d storage -c "SELECT contract_address FROM histocrawler.app_config WHERE indexer_schema = '$INDEXER_SCHEMA'" -tA)
+if [ -z "$INDEXER_SCHEMA" ]; then
+  INDEXER_SCHEMA="trust_mainnet"
+  if [ -f "$PROJECT_ROOT/.env" ]; then
+    ENV_SCHEMA=$(grep -E '^INDEXER_SCHEMA=' "$PROJECT_ROOT/.env" | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [ -n "$ENV_SCHEMA" ]; then
+      INDEXER_SCHEMA="$ENV_SCHEMA"
+    fi
+  fi
+  echo "No schema arg provided; using INDEXER_SCHEMA=$INDEXER_SCHEMA"
+fi
+
+# Point histocrawler at the in-stack RPC proxy for Intuition mainnet (chain 1155)
+if [ "$INDEXER_SCHEMA" = "trust_mainnet" ]; then
+  docker compose -p intuition -f docker/docker-compose-shared.yml exec -T database \
+    psql -U postgres -d storage -c \
+    "UPDATE histocrawler.app_config SET rpc_url = 'http://prod-rpc-proxy:3008/1155/proxy' WHERE indexer_schema = 'trust_mainnet';" \
+    >/dev/null || true
+fi
+
+CONTRACT_ADDRESS=$(docker compose -p intuition -f docker/docker-compose-shared.yml exec -T database psql -U postgres -d storage -c "SELECT contract_address FROM histocrawler.app_config WHERE indexer_schema = '$INDEXER_SCHEMA'" -tA)
 if [ -n "$CONTRACT_ADDRESS" ]; then
   export INTUITION_CONTRACT_ADDRESS=$CONTRACT_ADDRESS
   export INDEXER_SCHEMA=$INDEXER_SCHEMA

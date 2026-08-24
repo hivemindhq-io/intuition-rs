@@ -9,9 +9,41 @@ use log::{debug, info, warn};
 use models::{histocrawler::AppConfig, raw_logs::RawLog};
 use shared_utils::postgres::connect_to_db;
 use sqlx::PgPool;
-use std::{collections::HashMap, str::FromStr, time::Duration};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 use tokio::time::sleep;
 use url::Url;
+
+/// Added to `inter_batch_delay` for each unresolved throttling incident, so the
+/// crawl settles at a rate the provider tolerates rather than repeatedly probing
+/// the ceiling.
+const RATE_LIMIT_PACE_STEP: Duration = Duration::from_secs(2);
+const RATE_LIMIT_PACE_MAX: Duration = Duration::from_secs(30);
+/// One-off pause after a throttling incident. Bandwidth quotas reset on a window
+/// measured in minutes, so a short sleep just spends another request on a door
+/// that is still closed.
+///
+/// The ceiling stays well under the `Retry-After` the provider advertises (900s
+/// on Intuition testnet). That header is a worst case rather than a countdown —
+/// it returns the same 900 on every probe — and in practice crawling resumed
+/// after 60-240s cool-offs. Sleeping the full window idles through quota we
+/// already have, and a refused probe costs ~85 bytes, so looking early is close
+/// to free.
+const RATE_LIMIT_COOLOFF_BASE: Duration = Duration::from_secs(60);
+const RATE_LIMIT_COOLOFF_MAX: Duration = Duration::from_secs(240);
+/// Quiet time required to walk one step of pacing back off.
+///
+/// This was a count of clean batches, which a throttled crawl cannot reach: the
+/// count reset on every incident and incidents arrived long before the threshold,
+/// so pacing only ratcheted upward. Elapsed time is the honest measure of "the
+/// provider has tolerated us for a while", since it does not depend on batch
+/// size — which throttling itself halves.
+const RATE_LIMIT_DECAY_INTERVAL: Duration = Duration::from_secs(120);
+/// How long a chain-head reading stays usable while crawling near the tip.
+const HEAD_CACHE_TTL: Duration = Duration::from_secs(60);
 
 /// This is the main struct for the HistoCrawler application
 pub struct HistoCrawler {
@@ -26,17 +58,39 @@ pub struct HistoCrawler {
     pub max_logs_per_request: usize,
     pub min_batch_size: i64,
     pub max_batch_size: i64,
+    pub inter_batch_delay: Duration,
+    pub timestamp_delay: Duration,
+    // Self-throttling state
+    /// Extra per-batch delay earned by tripping the provider's limits.
+    pub rate_limit_delay: Duration,
+    /// Unresolved throttling incidents; drives both pacing and cool-off length.
+    rate_limit_hits: u32,
+    /// When pacing last moved, in either direction. Drives time-based recovery.
+    pace_changed_at: Option<Instant>,
+    /// Last chain head we read, and when. The head is only re-read when the crawl
+    /// is close enough for its exact value to matter.
+    cached_head: Option<(i64, Instant)>,
 }
 
 impl HistoCrawler {
     pub async fn new() -> Result<Self, HistoCrawlerError> {
         let env = Self::init().await?;
         let pg_pool = connect_to_db(&env.histocrawler_database_url).await?;
-        let backoff_delay = Duration::from_millis(1500);
+        let backoff_delay = Duration::from_millis(env.histocrawler_tail_poll_delay_ms);
         let app_config = AppConfig::find_by_indexer_schema(&env.indexer_schema, &pg_pool).await?;
         if let Some(app_config) = app_config {
             let contract_address = Address::from_str(&app_config.contract_address.to_lowercase())?;
             let provider = Self::get_provider(app_config.rpc_url.clone()).await?;
+            let max_batch_size = env.histocrawler_max_batch_size.max(10);
+            let max_logs_per_request = env.histocrawler_max_logs_per_request.max(50);
+            info!(
+                "Throttle config: max_batch_size={}, max_logs_per_request={}, inter_batch_delay_ms={}, timestamp_delay_ms={}, tail_poll_delay_ms={}",
+                max_batch_size,
+                max_logs_per_request,
+                env.histocrawler_inter_batch_delay_ms,
+                env.histocrawler_timestamp_delay_ms,
+                env.histocrawler_tail_poll_delay_ms
+            );
             Ok(Self {
                 contract_address,
                 pg_pool,
@@ -44,11 +98,17 @@ impl HistoCrawler {
                 backoff_delay,
                 app_config,
                 // Initialize adaptive batching with conservative defaults for high-activity contracts
-                current_batch_size: 50,  // Start small for safety
+                current_batch_size: 50.min(max_batch_size), // Start small for safety
                 avg_logs_per_block: 100.0,  // Conservative estimate
-                max_logs_per_request: 10_000,  // Limit to avoid RPC response size errors
+                max_logs_per_request,
                 min_batch_size: 10,
-                max_batch_size: 2000,
+                max_batch_size,
+                inter_batch_delay: Duration::from_millis(env.histocrawler_inter_batch_delay_ms),
+                timestamp_delay: Duration::from_millis(env.histocrawler_timestamp_delay_ms),
+                rate_limit_delay: Duration::ZERO,
+                rate_limit_hits: 0,
+                pace_changed_at: None,
+                cached_head: None,
             })
         } else {
             Err(HistoCrawlerError::AppConfigNotFound)
@@ -139,30 +199,49 @@ impl HistoCrawler {
         Ok(block)
     }
 
-    /// Batch fetch block timestamps for all unique blocks in the logs
-    /// This dramatically reduces RPC calls by fetching each block only once
+    /// Batch fetch block timestamps for all unique blocks in the logs.
+    ///
+    /// Most nodes (Reth, Erigon, Geth >=1.13) already return `blockTimestamp` on
+    /// each log, so those are harvested for free. Only blocks whose timestamp is
+    /// absent fall back to an `eth_getBlockByNumber` round trip — on a busy
+    /// contract that fallback is one request per block, which is what exhausts
+    /// bandwidth quotas on public RPCs.
     pub async fn fetch_block_timestamps_batch(
         &self,
         logs: &[Log],
     ) -> Result<HashMap<u64, u64>, HistoCrawlerError> {
         use std::collections::HashSet;
 
-        // Extract unique block numbers
-        let unique_blocks: HashSet<u64> = logs
-            .iter()
-            .filter_map(|log| log.block_number)
-            .collect();
+        let mut block_timestamps = HashMap::new();
+        let mut missing: HashSet<u64> = HashSet::new();
+
+        for log in logs {
+            let Some(block_number) = log.block_number else {
+                continue;
+            };
+            // A zero timestamp means the node omitted the field (alloy defaults it).
+            match log.block_timestamp {
+                Some(timestamp) if timestamp > 0 => {
+                    block_timestamps.insert(block_number, timestamp);
+                }
+                _ => {
+                    missing.insert(block_number);
+                }
+            }
+        }
+
+        // A block can appear on both paths if only some of its logs carry the field.
+        missing.retain(|block_number| !block_timestamps.contains_key(block_number));
 
         info!(
-            "Fetching timestamps for {} unique blocks (from {} logs)",
-            unique_blocks.len(),
-            logs.len()
+            "Timestamps for {} logs: {} from logs, {} need a block fetch",
+            logs.len(),
+            block_timestamps.len(),
+            missing.len()
         );
 
-        let mut block_timestamps = HashMap::new();
-
-        // Fetch each unique block timestamp
-        for block_number in unique_blocks {
+        // Fetch the remainder (optionally paced for public RPCs)
+        for block_number in missing {
             match self.fetch_block_timestamp(block_number as i64).await? {
                 Some(block) => {
                     block_timestamps.insert(block_number, block.header.timestamp);
@@ -171,15 +250,69 @@ impl HistoCrawler {
                     warn!("Block {} not found, skipping", block_number);
                 }
             }
+            if !self.timestamp_delay.is_zero() {
+                sleep(self.timestamp_delay).await;
+            }
         }
 
         Ok(block_timestamps)
     }
 
-    /// Get the last block number from the provider
+    /// Get the last block number from the provider (with retry — startup used to
+    /// fatal-exit here on a single flaky RPC, then Docker restart-looped).
     pub async fn get_last_block(&self) -> Result<i64, HistoCrawlerError> {
-        let block_number = self.provider.get_block_number().await?;
-        Ok(block_number as i64)
+        let mut delay = Duration::from_secs(2);
+        let max_delay = Duration::from_secs(60);
+        let max_attempts = 8;
+        let mut attempts = 0;
+
+        loop {
+            match self.provider.get_block_number().await {
+                Ok(block_number) => return Ok(block_number as i64),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    attempts += 1;
+                    if attempts > max_attempts {
+                        return Err(HistoCrawlerError::TransientError(error_msg));
+                    }
+                    // Hammering through a quota window only deepens the hole.
+                    let wait = if Self::is_throttled(&error_msg) {
+                        std::cmp::max(delay, RATE_LIMIT_COOLOFF_BASE)
+                    } else {
+                        delay
+                    };
+                    warn!(
+                        "eth_blockNumber failed, attempt {}/{}: {}. Retrying in {:?}...",
+                        attempts, max_attempts, e, wait
+                    );
+                    sleep(wait).await;
+                    delay = std::cmp::min(delay * 2, max_delay);
+                }
+            }
+        }
+    }
+
+    /// Read the head and refresh the cache.
+    async fn refresh_last_block(&mut self) -> Result<i64, HistoCrawlerError> {
+        let head = self.get_last_block().await?;
+        self.cached_head = Some((head, Instant::now()));
+        Ok(head)
+    }
+
+    /// Chain head, cached.
+    ///
+    /// A backfill spends most of its life millions of blocks behind the tip, where
+    /// re-reading the head every batch doubles the request count and changes no
+    /// decision. A stale head is safe while far behind because it only ever moves
+    /// forward, so acting on it just means crawling slightly less than available.
+    async fn cached_last_block(&mut self, next_block: i64) -> Result<i64, HistoCrawlerError> {
+        if let Some((head, read_at)) = self.cached_head {
+            let far_behind = next_block.saturating_add(self.max_batch_size * 4) < head;
+            if far_behind || read_at.elapsed() < HEAD_CACHE_TTL {
+                return Ok(head);
+            }
+        }
+        self.refresh_last_block().await
     }
 
     /// Get the provider
@@ -190,11 +323,8 @@ impl HistoCrawler {
 
     /// Initialize the environment variables
     pub async fn init() -> Result<Env, HistoCrawlerError> {
-        // Initialize the logger
-        env_logger::init();
-        // Read the .env file from the current directory or parents
-        dotenvy::dotenv().ok();
-        // Parse the .env file
+        // Logger + dotenv are initialized once in main (safe across restart loop).
+        // Parse the environment
         let env = envy::from_env::<Env>()?;
         Ok(env)
     }
@@ -269,28 +399,25 @@ impl HistoCrawler {
         start_block: &mut i64,
         end_block: &mut i64,
     ) -> Result<(), HistoCrawlerError> {
-        let last_block = self.get_last_block().await?;
-
         // Update the start and end block for the next iteration
         *start_block = *end_block + 1; // Add 1 to avoid skipping blocks
 
+        let mut current_last_block = self.cached_last_block(*start_block).await?;
+
         // If start_block is now beyond the last available block, we need to wait
-        let mut current_last_block = last_block;
         if *start_block > current_last_block {
             info!(
-                "Start block {} is beyond last available block {}, backing off for {:?} seconds",
+                "Start block {} is beyond last available block {}, backing off for {:?}",
                 *start_block, current_last_block, self.backoff_delay
             );
             sleep(self.backoff_delay).await;
 
-            // Check for new blocks
-            current_last_block = self.get_last_block().await?;
-            if current_last_block <= last_block {
+            // At the tip a cached head answers nothing; read through for new blocks.
+            current_last_block = self.refresh_last_block().await?;
+            if *start_block > current_last_block {
                 // No new blocks, keep current values and continue waiting
                 return Ok(());
             }
-
-            // New blocks are available, continue with updated last block
         }
 
         *end_block = self
@@ -300,9 +427,101 @@ impl HistoCrawler {
         Ok(())
     }
 
+    fn is_response_too_large(error_msg: &str) -> bool {
+        error_msg.contains("Response is too big")
+            || error_msg.contains("Exceeded max limit")
+            || error_msg.contains("response size")
+            || error_msg.contains("too large")
+    }
+
+    fn is_transient_error(error_msg: &str) -> bool {
+        error_msg.contains("timed out")
+            || error_msg.contains("timeout")
+            || error_msg.contains("IncompleteBody")
+            || error_msg.contains("incomplete body")
+            || error_msg.contains("decoding response body")
+            || error_msg.contains("error sending request")
+            || error_msg.contains("External service error")
+            || error_msg.contains("connection reset")
+            || error_msg.contains("connection closed")
+            || error_msg.contains("broken pipe")
+            || error_msg.contains("EOF")
+            || error_msg.contains("status: 500")
+            || error_msg.contains("status: 502")
+            || error_msg.contains("status: 503")
+            || error_msg.contains("HTTP error 500")
+            || error_msg.contains("ECONNRESET")
+    }
+
+    fn is_rate_limited(error_msg: &str) -> bool {
+        error_msg.contains("429")
+            || error_msg.contains("rate limit")
+            || error_msg.contains("Bandwidth limit")
+            || error_msg.contains("Too Many Requests")
+    }
+
+    /// The shared rpc-proxy collapses every upstream failure into a generic 500
+    /// ("External service error: Request to ... failed after 3 retries"), so a
+    /// bandwidth ban is indistinguishable from a blip by status alone. Treat the
+    /// proxy's own exhaustion signature as throttling: a provider that has failed
+    /// the proxy's full retry budget will not be rescued by us retrying faster.
+    fn is_upstream_exhausted(error_msg: &str) -> bool {
+        error_msg.contains("External service error")
+            || (error_msg.contains("failed after") && error_msg.contains("retries"))
+    }
+
+    fn is_throttled(error_msg: &str) -> bool {
+        Self::is_rate_limited(error_msg) || Self::is_upstream_exhausted(error_msg)
+    }
+
+    /// Record a throttling incident and return how long to stand down.
+    ///
+    /// Two effects: a one-off cool-off long enough to outlast a quota window, and
+    /// a lasting per-batch delay so the resumed crawl is slower than the one that
+    /// got us throttled. Without the second part the crawler just walks straight
+    /// back into the limit.
+    fn penalize_rate_limit(&mut self) -> Duration {
+        self.rate_limit_hits = self.rate_limit_hits.saturating_add(1);
+        self.pace_changed_at = Some(Instant::now());
+        self.rate_limit_delay = std::cmp::min(
+            RATE_LIMIT_PACE_STEP * self.rate_limit_hits,
+            RATE_LIMIT_PACE_MAX,
+        );
+
+        let exponent = self.rate_limit_hits.min(5) - 1;
+        std::cmp::min(
+            RATE_LIMIT_COOLOFF_BASE * 2u32.saturating_pow(exponent),
+            RATE_LIMIT_COOLOFF_MAX,
+        )
+    }
+
+    /// Walk pacing back down after the provider has tolerated us for a while.
+    fn maybe_relax_pacing(&mut self) {
+        if self.rate_limit_hits == 0 {
+            return;
+        }
+        let Some(changed_at) = self.pace_changed_at else {
+            self.pace_changed_at = Some(Instant::now());
+            return;
+        };
+        if changed_at.elapsed() < RATE_LIMIT_DECAY_INTERVAL {
+            return;
+        }
+        self.pace_changed_at = Some(Instant::now());
+        self.rate_limit_hits -= 1;
+        self.rate_limit_delay = std::cmp::min(
+            RATE_LIMIT_PACE_STEP * self.rate_limit_hits,
+            RATE_LIMIT_PACE_MAX,
+        );
+        info!(
+            "No throttling for {:?}; relaxing added pacing to {:?}",
+            RATE_LIMIT_DECAY_INTERVAL, self.rate_limit_delay
+        );
+    }
+
     async fn get_logs_with_retry(&self, filter: &Filter) -> Result<Vec<Log>, HistoCrawlerError> {
         let mut delay = Duration::from_secs(1);
-        let max_delay = Duration::from_secs(10);
+        let max_delay = Duration::from_secs(30);
         let mut attempts = 0;
         let max_attempts = 5;
 
@@ -312,16 +531,41 @@ impl HistoCrawler {
                 Err(e) => {
                     let error_msg = e.to_string();
 
-                    // Detect RPC response size limit errors
-                    if error_msg.contains("Response is too big")
-                        || error_msg.contains("Exceeded max limit")
-                        || error_msg.contains("response size")
-                        || error_msg.contains("too large") {
+                    if Self::is_response_too_large(&error_msg) {
                         warn!(
-                            "RPC response size limit exceeded. Error: {}. Batch size needs reduction.",
+                            "RPC response size limit exceeded: {}. Batch size needs reduction.",
                             error_msg
                         );
                         return Err(HistoCrawlerError::ResponseSizeLimitExceeded);
+                    }
+
+                    // An explicit throttling response is not worth retrying at all;
+                    // the caller owns the cool-off.
+                    if Self::is_rate_limited(&error_msg) {
+                        return Err(HistoCrawlerError::RateLimited(error_msg));
+                    }
+
+                    if Self::is_transient_error(&error_msg) {
+                        attempts += 1;
+                        if attempts > max_attempts {
+                            warn!(
+                                "Transient error persisted after {} attempts: {}",
+                                max_attempts, error_msg
+                            );
+                            // Surviving the whole retry budget means the upstream is
+                            // down or refusing us, not momentarily busy.
+                            if Self::is_upstream_exhausted(&error_msg) {
+                                return Err(HistoCrawlerError::RateLimited(error_msg));
+                            }
+                            return Err(HistoCrawlerError::TransientError(error_msg));
+                        }
+                        warn!(
+                            "Transient RPC error, attempt {}/{}: {}. Retrying in {:?}...",
+                            attempts, max_attempts, e, delay
+                        );
+                        sleep(delay).await;
+                        delay = std::cmp::min(delay * 2, max_delay);
+                        continue;
                     }
 
                     attempts += 1;
@@ -387,25 +631,80 @@ impl HistoCrawler {
                 start_block, end_block, self.current_batch_size
             );
 
-            // Handle RPC response size errors by reducing batch size
             let logs = match self.get_logs_with_retry(&filter).await {
                 Ok(logs) => logs,
                 Err(HistoCrawlerError::ResponseSizeLimitExceeded) => {
-                    // Reduce batch size aggressively (50%) and recalculate end_block
                     self.reduce_batch_size(0.5);
                     end_block = self
                         .get_block_number_ceiling(start_block, end_block)
                         .await?;
-                    info!("Reduced batch size, retrying with end_block: {}", end_block);
+                    info!("Response too large, reduced batch to end_block: {}", end_block);
                     continue;
                 }
-                Err(e) => return Err(e),
+                Err(HistoCrawlerError::RateLimited(msg)) => {
+                    let cooloff = self.penalize_rate_limit();
+                    warn!(
+                        "Throttled by RPC provider: {}. Cooling off {:?}, then crawling with \
+                         {:?} extra pacing per batch.",
+                        msg, cooloff, self.rate_limit_delay
+                    );
+                    self.reduce_batch_size(0.5);
+                    end_block = self
+                        .get_block_number_ceiling(start_block, end_block)
+                        .await?;
+                    sleep(cooloff).await;
+                    continue;
+                }
+                Err(HistoCrawlerError::TransientError(msg)) => {
+                    warn!("Transient error: {}. Reducing batch and backing off...", msg);
+                    self.reduce_batch_size(0.7);
+                    end_block = self
+                        .get_block_number_ceiling(start_block, end_block)
+                        .await?;
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if Self::is_throttled(&error_msg) {
+                        let cooloff = self.penalize_rate_limit();
+                        warn!("Throttling escaped retry loop: {}. Cooling off {:?}...", e, cooloff);
+                        self.reduce_batch_size(0.5);
+                        end_block = self
+                            .get_block_number_ceiling(start_block, end_block)
+                            .await?;
+                        sleep(cooloff).await;
+                        continue;
+                    }
+                    if Self::is_transient_error(&error_msg) {
+                        warn!("Recoverable error escaped retry loop: {}. Backing off...", e);
+                        self.reduce_batch_size(0.5);
+                        end_block = self
+                            .get_block_number_ceiling(start_block, end_block)
+                            .await?;
+                        sleep(Duration::from_secs(10)).await;
+                        continue;
+                    }
+                    return Err(e);
+                }
             };
 
             info!("Retrieved {} logs for batch", logs.len());
 
             // Batch fetch block timestamps for all logs (massive RPC call reduction!)
-            let block_timestamps = self.fetch_block_timestamps_batch(&logs).await?;
+            let block_timestamps = match self.fetch_block_timestamps_batch(&logs).await {
+                Ok(timestamps) => timestamps,
+                Err(e) if Self::is_throttled(&e.to_string()) => {
+                    let cooloff = self.penalize_rate_limit();
+                    warn!(
+                        "Throttled while backfilling block timestamps: {}. Cooling off {:?}...",
+                        e, cooloff
+                    );
+                    sleep(cooloff).await;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
 
             // Process logs in the current batch with cached timestamps
             let mut encountered_error = false;
@@ -451,6 +750,12 @@ impl HistoCrawler {
             self.app_config
                 .update_last_processed_block(end_block, &self.pg_pool)
                 .await?;
+
+            self.maybe_relax_pacing();
+            let pause = self.inter_batch_delay + self.rate_limit_delay;
+            if !pause.is_zero() {
+                sleep(pause).await;
+            }
 
             self.update_start_end_blocks(&mut start_block, &mut end_block)
                 .await?;

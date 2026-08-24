@@ -1,6 +1,6 @@
 # Stage 1 - Generate recipe file
 FROM rust:1.89-slim AS chef
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --locked
 WORKDIR /app
 
 FROM chef AS planner
@@ -39,7 +39,9 @@ RUN apt-get update && \
 WORKDIR /usr/src/app
 
 COPY --from=builder /app/target/release/histocrawler .
+COPY apps/histocrawler/entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
 
 ENV RUST_LOG=info
 
-ENTRYPOINT ["/usr/src/app/histocrawler"]
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]

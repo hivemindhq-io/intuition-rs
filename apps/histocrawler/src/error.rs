@@ -28,4 +28,8 @@ pub enum HistoCrawlerError {
     InvalidBlockRange { start: i64, end: i64 },
     #[error("RPC response size limit exceeded - batch size too large")]
     ResponseSizeLimitExceeded,
+    #[error("RPC provider is throttling us (will cool off): {0}")]
+    RateLimited(String),
+    #[error("Transient RPC error (will retry): {0}")]
+    TransientError(String),
 }

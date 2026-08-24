@@ -1,6 +1,6 @@
 # Stage 1 - Generate recipe file
 FROM rust:1.89.0-slim-bookworm AS chef
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --locked
 WORKDIR /app
 
 FROM chef AS planner
@@ -8,9 +8,7 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 2 - Build dependencies and application
-FROM rust:1.89.0-slim-bookworm AS builder
-RUN cargo install cargo-chef
-WORKDIR /app
+FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 
 RUN apt-get update && \

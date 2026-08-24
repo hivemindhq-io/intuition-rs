@@ -1,0 +1,173 @@
+# Separate Intuition TESTNET indexer stack (project: intuition-testnet).
+# Does not share DB/volumes/ports with the mainnet `intuition` project.
+services:
+  database:
+    container_name: testnet-database
+    image: timescale/timescaledb-ha:pg17.5-ts2.20.1
+    environment:
+      OPENAI_API_KEY: $OPENAI_API_KEY
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: storage
+      PGPORT: 5435
+    volumes:
+      # timescale/timescaledb-ha uses PGDATA=/home/postgres/pgdata/data — NOT
+      # /var/lib/postgresql/data. Mounting the wrong path means every container
+      # recreate silently re-initdbs into the container layer and loses the index.
+      - testnet-database-data:/home/postgres/pgdata/data
+    ports:
+      - 5436:5435
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d storage"]
+      interval: 2s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  pgai-installer:
+    container_name: testnet-pgai-installer
+    image: ghcr.io/0xintuition/pgai:latest
+    environment:
+      POSTGRES_URL: postgres://postgres:postgres@database:5435/storage
+    depends_on:
+      database:
+        condition: service_healthy
+
+  vectorizer-worker:
+    container_name: testnet-vectorizer-worker
+    image: timescale/pgai-vectorizer-worker:v0.10.5
+    # Without this the worker defaults to `restart: no`. It exited on a transient
+    # DB connection error during a database restart and stayed down for two days,
+    # silently freezing embeddings while atoms kept indexing.
+    restart: unless-stopped
+    environment:
+      PGAI_VECTORIZER_WORKER_DB_URL: postgres://postgres:postgres@database:5435/storage
+      OPENAI_API_KEY: $OPENAI_API_KEY
+    command: [ "--poll-interval", "5s", "--log-level", "DEBUG" ]
+    depends_on:
+      pgai-installer:
+        condition: service_completed_successfully
+
+  redis:
+    container_name: testnet-redis
+    image: redis:7.2-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - testnet-redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  redis-setup:
+    container_name: testnet-redis-setup
+    image: redis:7.2-alpine
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../apps/consumer/devops/redis-setup.sh:/redis-setup.sh
+    entrypoint: ["/bin/sh", "/redis-setup.sh"]
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    restart: "no"
+
+  graphql-engine:
+    container_name: testnet-graphql-engine
+    image: hasura/graphql-engine:v2.48.0
+    ports:
+      - '8082:8080'
+    restart: always
+    environment:
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
+      HASURA_GRAPHQL_CACHE_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'true'
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: 'anonymous'
+      HASURA_GRAPHQL_DEV_MODE: 'true'
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      HASURA_GRAPHQL_ADMIN_SECRET: 'myadminsecretkey'
+      HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES: 'true'
+      PINATA_AUTH: Bearer $PINATA_API_JWT
+      chartApiUrl: 'http://chart-api:3010'
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  ipfs:
+    container_name: testnet-ipfs
+    image: ipfs/kubo:latest
+    restart: always
+    ports:
+      - 4011:4001
+      - 5011:5001
+      - 8083:8080
+    environment:
+      IPFS_PATH: /data/ipfs
+      PINATA_API_JWT: $PINATA_API_JWT
+      QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING: "true"
+      QUIC_GO_SET_RECEIVE_BUFFER: "false"
+    volumes:
+      - testnet-ipfs-data:/data/ipfs
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        if [ ! -f /data/ipfs/config ]; then
+          ipfs init;
+        fi;
+        ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001;
+        ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080;
+        ipfs config --json Services.RemotePinning.Pinata '{
+          \"api\": {
+            \"endpoint\": \"https://api.pinata.cloud/psa\",
+            \"key\": \"'\"$PINATA_API_JWT\"'\"
+          }
+        }';
+        ipfs config --json Peering.Peers '[{\"ID\": \"Qma8ddFEQWEU8ijWvdxXm3nxU7oHsRtCykAaVz8WUYhiKn\", \"Addrs\": [\"/dnsaddr/bitswap.pinata.cloud\"]}]';
+
+        # Consumer-grade routers track only ~1-8k connections. A DHT-participating
+        # Kubo node dials thousands of peers and exhausts that table, which makes the
+        # router silently drop unrelated outbound SYNs (host loses internet access).
+        # Content routing is delegated over HTTPS instead, and UDP transports are off
+        # because QUIC mappings linger far longer than TCP ones.
+        ipfs config --json Routing '{\"Type\":\"custom\",\"Routers\":{\"HttpRouter\":{\"Type\":\"http\",\"Parameters\":{\"Endpoint\":\"https://delegated-ipfs.dev\"}}},\"Methods\":{\"find-providers\":{\"RouterName\":\"HttpRouter\"},\"find-peers\":{\"RouterName\":\"HttpRouter\"},\"get-ipns\":{\"RouterName\":\"HttpRouter\"},\"put-ipns\":{\"RouterName\":\"HttpRouter\"},\"provide\":{\"RouterName\":\"HttpRouter\"}}}';
+        ipfs config --json Addresses.Swarm '[\"/ip4/0.0.0.0/tcp/4001\"]';
+        ipfs config --json Swarm.Transports.Network.QUIC false;
+        ipfs config --json Swarm.Transports.Network.WebTransport false;
+        ipfs config --json Swarm.Transports.Network.WebRTCDirect false;
+        ipfs config --json Swarm.EnableHolePunching false;
+        ipfs config --json Swarm.DisableNatPortMap true;
+        ipfs config --json Swarm.ConnMgr.HighWater 40;
+        ipfs config --json Swarm.ConnMgr.LowWater 20;
+        ipfs config Swarm.ConnMgr.GracePeriod 5s;
+        ipfs config Reprovider.Interval 0;
+        exec ipfs daemon --migrate=true --agent-version-suffix=docker
+      "
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  indexer-migrations:
+    container_name: testnet-indexer-migrations
+    image: ghcr.io/0xintuition/indexer-and-cache-migrations:latest
+    environment:
+      INDEXER_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  testnet-database-data:
+  testnet-ipfs-data:
+  testnet-redis-data:

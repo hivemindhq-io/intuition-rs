@@ -1,0 +1,238 @@
+# App services for the SEPARATE Intuition TESTNET indexer (project: intuition-testnet).
+services:
+  resolver_consumer:
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "resolver"]
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      CONSUMER_TYPE: 'redis_streams'
+      DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      ENS_CONTRACT_ADDRESS: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e'
+      IMAGE_GUARD_URL: 'http://api:3000'
+      IPFS_GATEWAY_URL: 'http://ipfs:8080'
+      IPFS_UPLOAD_URL: 'http://ipfs:5001'
+      IPFS_UPLOAD_STREAM: 'ipfs_upload_stream'
+      PINATA_API_JWT: $PINATA_API_JWT
+      PINATA_GATEWAY_TOKEN: $PINATA_GATEWAY_TOKEN
+      PG_MIN_CONNECTIONS: '5'
+      RESOLVER_STREAM: 'resolver_stream'
+      RPC_URL_BASE: "http://testnet-rpc-proxy:3008/13579/proxy"
+      RPC_URL_MAINNET: "http://testnet-rpc-proxy:3008/1/proxy"
+      RUST_LOG: 'info'
+      BACKEND_SCHEMA: 'public'
+      REDIS_URL: 'redis://redis:6379'
+      BASE_MAINNET_RPC_URL: $BASE_MAINNET_RPC_URL
+      BASE_SEPOLIA_RPC_URL: $BASE_SEPOLIA_RPC_URL
+      ETHEREUM_MAINNET_RPC_URL: $ETHEREUM_MAINNET_RPC_URL
+      ETHEREUM_SEPOLIA_RPC_URL: $ETHEREUM_SEPOLIA_RPC_URL
+      LINEA_MAINNET_RPC_URL: $LINEA_MAINNET_RPC_URL
+      LINEA_SEPOLIA_RPC_URL: $LINEA_SEPOLIA_RPC_URL
+      TRUST_TESTNET_RPC_URL: $TRUST_TESTNET_RPC_URL
+      TRUST_MAINNET_RPC_URL: $TRUST_MAINNET_RPC_URL
+      LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
+      POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
+    restart: always
+    volumes:
+      - ./logs-testnet:/app/logs
+    deploy:
+      replicas: 1
+
+  ipfs_upload_consumer:
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "ipfs-upload"]
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      CONSUMER_TYPE: 'redis_streams'
+      DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      IMAGE_GUARD_URL: 'http://api:3000'
+      IPFS_GATEWAY_URL: 'http://ipfs:8080'
+      IPFS_UPLOAD_URL: 'http://ipfs:5001'
+      PINATA_API_JWT: $PINATA_API_JWT
+      PINATA_GATEWAY_TOKEN: $PINATA_GATEWAY_TOKEN
+      PG_MIN_CONNECTIONS: '5'
+      IPFS_UPLOAD_STREAM: 'ipfs_upload_stream'
+      RUST_LOG: 'info'
+      BACKEND_SCHEMA: 'public'
+      REDIS_URL: 'redis://redis:6379'
+    restart: always
+    volumes:
+      - ./logs-testnet:/app/logs
+    deploy:
+      replicas: 1
+
+  decoded_consumer:
+    container_name: testnet-decoded-consumer
+    image: consumer:local-itemlist
+    build:
+      context: ..
+      dockerfile: apps/consumer/Dockerfile
+    command: ["/app/consumer", "--mode", "decoded"]
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      CONSUMER_TYPE: 'redis_hybrid'
+      INDEXER_DATABASE_URL: "postgres://postgres:postgres@database:5435/storage"
+      INDEXER_SCHEMA: trust_testnet
+      ENVIRONMENT_NAME: "local_development_testnet"
+      # Historical sync takes one semaphore permit PER LOG, so this is the
+      # backfill's concurrency, not a thread pool size. At 1 it replays the 3.9M
+      # log backlog strictly serially.
+      #
+      # Measured on the trust_testnet backfill: 62 rows/s at 1, 104 rows/s at 8,
+      # 101 rows/s at 24. The knee is at or below 8 — past that the bottleneck is
+      # no longer per-log concurrency — so 8 buys the full speedup without
+      # holding connections the pool would rather keep free.
+      #
+      # Do NOT also point RPC_URL_BASE straight at a public endpoint to "help"
+      # this: bypassing testnet-rpc-proxy for the per-log balance lookups costs a
+      # TLS handshake per call and measured 48 rows/s, slower than THREADS=1.
+      THREADS: '8'
+      INITIAL_CONTRACT_VERSION: $INITIAL_CONTRACT_VERSION
+      CONSUMER_METRICS_API_PORT: '3002'
+      DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      DECODED_LOGS_STREAM: 'decoded_logs_stream'
+      INTUITION_CONTRACT_ADDRESS: $INTUITION_CONTRACT_ADDRESS
+      LOCALSTACK_URL: 'http://redis:6379'
+      PG_MIN_CONNECTIONS: '20'
+      RESOLVER_STREAM: 'resolver_stream'
+      RPC_URL_BASE: "http://testnet-rpc-proxy:3008/13579/proxy"
+      RUST_LOG: 'info'
+      BACKEND_SCHEMA: 'public'
+      REDIS_URL: 'redis://redis:6379'
+      LOG_LEVEL: 'info'
+    restart: always
+    volumes:
+      - ./logs-testnet:/app/logs
+    ports:
+      - 3022:3002
+
+  api:
+    container_name: testnet-image-guard
+    image: ghcr.io/0xintuition/image-guard:2.0.21
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      CLASSIFICATION_API_PORT: '3000'
+      DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      HF_TOKEN: ''
+      IPFS_GATEWAY_URL: 'http://ipfs:8080'
+      IPFS_UPLOAD_URL: 'http://ipfs:5001'
+      PINATA_API_JWT: $PINATA_API_JWT
+      RUST_LOG: 'info'
+      FLAG_LOCAL_WITH_CLASSIFICATION: 'true'
+      BE_SCHEMA: 'public'
+      IMAGE_API_SCHEMA: 'cached_images'
+      INDEXER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+    ports:
+      - 3020:3000
+    restart: always
+
+  testnet-rpc-proxy:
+    container_name: testnet-rpc-proxy
+    image: ghcr.io/0xintuition/rpc-proxy:3.0.1
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      PROXY_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      PROXY_API_PORT: '3008'
+      PROXY_SCHEMA: "rpc_proxy"
+      BASE_MAINNET_RPC_URL: $BASE_MAINNET_RPC_URL
+      BASE_SEPOLIA_RPC_URL: $BASE_SEPOLIA_RPC_URL
+      ETHEREUM_MAINNET_RPC_URL: $ETHEREUM_MAINNET_RPC_URL
+      ETHEREUM_SEPOLIA_RPC_URL: $ETHEREUM_SEPOLIA_RPC_URL
+      LINEA_MAINNET_RPC_URL: $LINEA_MAINNET_RPC_URL
+      LINEA_SEPOLIA_RPC_URL: $LINEA_SEPOLIA_RPC_URL
+      TRUST_TESTNET_RPC_URL: $TRUST_TESTNET_RPC_URL
+      TRUST_MAINNET_RPC_URL: $TRUST_MAINNET_RPC_URL
+      LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
+      POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
+      RUST_LOG: 'info'
+    restart: always
+    ports:
+      - 3028:3008
+
+  histocrawler:
+    container_name: testnet-histocrawler
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: histocrawler:local-throttle
+    build:
+      context: ..
+      dockerfile: apps/histocrawler/Dockerfile
+    # Avoid tight crash-loops when the public testnet RPC returns 429
+    restart: on-failure:30
+    environment:
+      # Bypass broken Docker Desktop HTTP(S) proxy
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      http_proxy: ''
+      https_proxy: ''
+      NO_PROXY: '*'
+      no_proxy: '*'
+      HISTOCRAWLER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
+      INDEXER_SCHEMA: trust_testnet
+      RUST_LOG: 'info'
+      # Gentle crawl against the public testnet RPC. These are a starting point,
+      # not a guarantee: the crawler adds its own pacing whenever the provider
+      # throttles it, so the sustainable rate is discovered rather than guessed.
+      #
+      # The quota that matters here is bandwidth, not request count, so
+      # MAX_LOGS_PER_REQUEST is the important lever — it bounds response size,
+      # and the adaptive batcher shrinks the block window to respect it through
+      # dense regions of history.
+      #
+      # MAX_BATCH_SIZE only needs to be large enough that the logs budget above
+      # is what binds. Testnet history is extremely front-loaded: everything
+      # past ~8,116,000 runs under 1 log/block, where a 250-block window
+      # returned ~100 logs and spent a full request round-trip to cross almost
+      # nothing. Per-response overhead then dominates actual log bytes, which
+      # is the worst way to spend a bandwidth quota. A wider ceiling lets the
+      # batcher open up across empty ranges and still collapse on dense ones.
+      #
+      # Timestamps now come from the logs themselves, so TIMESTAMP_DELAY only
+      # applies to the rare block that omits blockTimestamp.
+      HISTOCRAWLER_MAX_BATCH_SIZE: '4000'
+      HISTOCRAWLER_MAX_LOGS_PER_REQUEST: '2500'
+      HISTOCRAWLER_INTER_BATCH_DELAY_MS: '4000'
+      HISTOCRAWLER_TIMESTAMP_DELAY_MS: '250'
+      HISTOCRAWLER_TAIL_POLL_DELAY_MS: '15000'
+    depends_on:
+      testnet-rpc-proxy:
+        condition: service_started
+
+volumes:
+  raw_consumer:
+  decoded_consumer:
