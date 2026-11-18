@@ -8,6 +8,7 @@ use crate::{
                 handle_binary_data, try_to_parse_json_or_text, try_to_resolve_ipfs_uri,
             },
             ens_resolver::Ens,
+            tns_resolver::Tns,
         },
         types::ResolverConsumerContext,
     },
@@ -16,7 +17,7 @@ use crate::{
 use alloy::primitives::Address;
 use models::{
     account::Account,
-    atom::{Atom, AtomType},
+    atom::{Atom, AtomResolvingStatus, AtomType},
     traits::SimpleCrud,
     types::FixedBytesWrapper,
 };
@@ -104,8 +105,11 @@ impl ResolverMessageType {
         // Resolve the CAIP-22 (parses from atom.data, fetches tokenURI, stores as json_object)
         let metadata = resolve_caip22(atom, resolver_consumer_context).await?;
 
-        // Update atom with resolved metadata (label, image, atom_type)
+        // Update atom with resolved metadata (label, image, atom_type) and flip the
+        // status in the same statement, so there is no window where the atom is
+        // `Resolved` with stale metadata.
         let mut atom = atom.clone();
+        atom.resolving_status = AtomResolvingStatus::Resolved;
         metadata
             .update_atom_metadata(
                 &mut atom,
@@ -113,13 +117,6 @@ impl ResolverMessageType {
                 resolver_consumer_context.pool(),
             )
             .await?;
-
-        // Mark as resolved
-        atom.mark_as_resolved(
-            resolver_consumer_context.backend_schema(),
-            resolver_consumer_context.pool(),
-        )
-        .await?;
 
         debug!("Successfully resolved CAIP-22 atom: {:?}", atom);
         Ok(())
@@ -183,27 +180,35 @@ impl ResolverMessageType {
         .ok_or(ConsumerError::AccountNotFound)
     }
 
-    /// This function processes an account message type
+    /// This function processes an account message type.
+    /// TNS resolution is attempted first. If no TNS name is found,
+    /// falls back to ENS resolution.
     async fn process_account(
         &self,
         resolver_consumer_context: &ResolverConsumerContext,
         account: &mut Account,
     ) -> Result<(), ConsumerError> {
-        let ens = Ens::get_ens(Address::from_str(&account.id)?, resolver_consumer_context).await?;
-        if let Some(_name) = ens.name.clone() {
-            debug!("ENS for account: {:?}", ens);
+        let address = Address::from_str(&account.id)?;
+
+        // TNS takes priority; fall back to ENS when no TNS name is set.
+        let mut resolved = Tns::get_tns(address, resolver_consumer_context).await?;
+        if resolved.name.is_none() {
+            resolved = Ens::get_ens(address, resolver_consumer_context).await?;
+        }
+
+        if let Some(_name) = resolved.name.clone() {
             // We need to update the account metadata
             debug!("Updating account metadata for account: {:?}", account);
             self.update_account_metadata(
                 resolver_consumer_context,
                 account.id.clone(),
-                ens.clone(),
+                resolved.clone(),
             )
             .await?;
             // We also need to update the atom
             if let Some(atom_id) = account.atom_id.clone() {
                 debug!("Updating atom metadata for account: {:?}", account);
-                self.update_atom_metadata(resolver_consumer_context, &atom_id, ens)
+                self.update_atom_metadata(resolver_consumer_context, &atom_id, resolved)
                     .await?;
             } else {
                 // We deal with the case where the account atom_id was not set
@@ -212,7 +217,7 @@ impl ResolverMessageType {
                 debug!("No atom found for account: {:?}", account)
             }
         } else {
-            debug!("No ENS found for account: {:?}", account);
+            debug!("No name resolved (TNS or ENS) for account: {:?}", account);
         }
         Ok(())
     }
@@ -329,19 +334,16 @@ impl ResolverMessageType {
             .find_and_update_atom(resolver_consumer_context, atom_id, metadata)
             .await?;
 
-        if let Some(image) = atom.image.clone() {
-            self.handle_atom_image(resolver_consumer_context, image)
+        // schema.org objects without an image come through as `"image": ""`; do not
+        // send an empty upload request to the IPFS upload consumer for those.
+        if let Some(image) = atom
+            .image
+            .as_deref()
+            .filter(|image| !image.trim().is_empty())
+        {
+            self.handle_atom_image(resolver_consumer_context, image.to_string())
                 .await?;
         }
-
-        atom.mark_as_resolved(
-            &resolver_consumer_context
-                .server_initialize
-                .env
-                .backend_schema,
-            &resolver_consumer_context.pg_pool,
-        )
-        .await?;
 
         debug!("Updated atom metadata: {atom:?}");
         Ok(())
@@ -365,6 +367,11 @@ impl ResolverMessageType {
         .await?
         .ok_or(ConsumerError::AtomNotFound)?;
 
+        // The metadata and the `Resolved` status are written in ONE statement
+        // (`Atom::update_metadata`). A separate status-only update after the metadata
+        // write is exactly what let a concurrent stale write leave atoms `Resolved`
+        // with `Unknown` type/label.
+        atom.resolving_status = AtomResolvingStatus::Resolved;
         metadata
             .update_atom_metadata(
                 &mut atom,
@@ -453,7 +460,8 @@ impl ResolverMessageType {
         .ok_or(ConsumerError::AtomNotFound)?;
         atom.label = ens.name;
         atom.image = ens.image;
-        atom.upsert(backend_schema, &resolver_consumer_context.pg_pool)
+        // Only touch the metadata columns; never re-write the whole row from a copy.
+        atom.update_metadata(backend_schema, &resolver_consumer_context.pg_pool)
             .await?;
         Ok(())
     }
