@@ -2,7 +2,7 @@ services:
 
   
   resolver_consumer:
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
@@ -50,7 +50,7 @@ services:
 
   
   ipfs_upload_consumer:
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
@@ -82,7 +82,7 @@ services:
     
   decoded_consumer:
     container_name: decoded_consumer
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
