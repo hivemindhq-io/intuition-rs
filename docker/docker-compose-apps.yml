@@ -1,3 +1,5 @@
+# No service restarts on its own (restart: "no"). Kylan, 2026-11-18: "Never restart. Let me
+# restart manually". Start with scripts/start.sh or scripts/start-testnet.sh.
 services:
 
   
@@ -42,7 +44,7 @@ services:
       TRUST_MAINNET_RPC_URL: $TRUST_MAINNET_RPC_URL
       LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
       POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
-    restart: always
+    restart: "no"
     volumes:
       - ./logs:/app/logs
     deploy:
@@ -74,7 +76,7 @@ services:
       RUST_LOG: 'info'
       BACKEND_SCHEMA: 'public'
       REDIS_URL: 'redis://redis:6379'
-    restart: always
+    restart: "no"
     volumes:
       - ./logs:/app/logs
     deploy:
@@ -114,7 +116,7 @@ services:
       BACKEND_SCHEMA: 'public'
       REDIS_URL: 'redis://redis:6379'
       LOG_LEVEL: 'info'
-    restart: always
+    restart: "no"
     volumes:
       - ./logs:/app/logs
     ports:
@@ -144,8 +146,7 @@ services:
       INDEXER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
     ports:
       - 3005:3000
-    restart: always
-    
+    restart: "no"
   prod-rpc-proxy:
     container_name: prod-rpc-proxy
     image: ghcr.io/0xintuition/rpc-proxy:3.0.1
@@ -170,7 +171,7 @@ services:
       LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
       POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
       RUST_LOG: 'info'
-    restart: always
+    restart: "no"
     ports:
       - 3008:3008
 
@@ -188,7 +189,7 @@ services:
       DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
       REDIS_URL: 'redis://redis:6379'
       RUST_LOG: 'info'
-    restart: always
+    restart: "no"
     ports:
       - 3010:3010
 
@@ -202,7 +203,7 @@ services:
       dockerfile: apps/histocrawler/Dockerfile
     # Avoid tight Docker crash-loops when upstream RPC is briefly unreachable.
     # Built from local apps/histocrawler with process-level backoff.
-    restart: on-failure:30
+    restart: "no"
     environment:
       HTTP_PROXY: ''
       HTTPS_PROXY: ''

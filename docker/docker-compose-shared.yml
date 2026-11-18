@@ -1,3 +1,5 @@
+# No service restarts on its own (restart: "no"). Kylan, 2026-11-18: "Never restart. Let me
+# restart manually". Start with scripts/start.sh or scripts/start-testnet.sh.
 services:
   database:
     container_name: database
@@ -51,7 +53,7 @@ services:
     # Without this the worker defaults to `restart: no`. The testnet worker exited
     # on a transient DB connection error and stayed down for two days, silently
     # freezing embeddings while atoms kept indexing.
-    restart: unless-stopped
+    restart: "no"
     environment:
       PGAI_VECTORIZER_WORKER_DB_URL: postgres://postgres:postgres@database:5435/storage
       OPENAI_API_KEY: $OPENAI_API_KEY
@@ -124,7 +126,7 @@ services:
     image: hasura/graphql-engine:v2.48.0
     ports:
       - '8080:8080'
-    restart: always
+    restart: "no"
     environment:
       HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
       HASURA_GRAPHQL_CACHE_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
@@ -148,7 +150,7 @@ services:
   ipfs:
     container_name: ipfs
     image: ipfs/kubo:latest
-    restart: always
+    restart: "no"
     ports:
       - 4001:4001
       - 4002:4002/udp
@@ -265,8 +267,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     depends_on:
       - prometheus
-    restart: unless-stopped
-
+    restart: "no"
   reth:
     container_name: reth
     image: ghcr.io/paradigmxyz/reth

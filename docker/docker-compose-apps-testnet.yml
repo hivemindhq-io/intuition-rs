@@ -1,4 +1,6 @@
 # App services for the SEPARATE Intuition TESTNET indexer (project: intuition-testnet).
+# No service restarts on its own (restart: "no"). Kylan, 2026-11-18: "Never restart. Let me
+# restart manually". Start with scripts/start.sh or scripts/start-testnet.sh.
 services:
   resolver_consumer:
     image: consumer:local-upstream-2026-11-18
@@ -40,7 +42,7 @@ services:
       TRUST_MAINNET_RPC_URL: $TRUST_MAINNET_RPC_URL
       LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
       POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
-    restart: always
+    restart: "no"
     volumes:
       - ./logs-testnet:/app/logs
     deploy:
@@ -72,7 +74,7 @@ services:
       RUST_LOG: 'info'
       BACKEND_SCHEMA: 'public'
       REDIS_URL: 'redis://redis:6379'
-    restart: always
+    restart: "no"
     volumes:
       - ./logs-testnet:/app/logs
     deploy:
@@ -123,7 +125,7 @@ services:
       BACKEND_SCHEMA: 'public'
       REDIS_URL: 'redis://redis:6379'
       LOG_LEVEL: 'info'
-    restart: always
+    restart: "no"
     volumes:
       - ./logs-testnet:/app/logs
     ports:
@@ -153,8 +155,7 @@ services:
       INDEXER_DATABASE_URL: 'postgres://postgres:postgres@database:5435/storage'
     ports:
       - 3020:3000
-    restart: always
-
+    restart: "no"
   testnet-rpc-proxy:
     container_name: testnet-rpc-proxy
     image: ghcr.io/0xintuition/rpc-proxy:3.0.1
@@ -180,7 +181,7 @@ services:
       LOCAL_INTUITION_RPC_URL: $LOCAL_INTUITION_RPC_URL
       POLYGON_AMOY_RPC_URL: $POLYGON_AMOY_RPC_URL
       RUST_LOG: 'info'
-    restart: always
+    restart: "no"
     ports:
       - 3028:3008
 
@@ -193,7 +194,7 @@ services:
       context: ..
       dockerfile: apps/histocrawler/Dockerfile
     # Avoid tight crash-loops when the public testnet RPC returns 429
-    restart: on-failure:30
+    restart: "no"
     environment:
       # Bypass broken Docker Desktop HTTP(S) proxy
       HTTP_PROXY: ''

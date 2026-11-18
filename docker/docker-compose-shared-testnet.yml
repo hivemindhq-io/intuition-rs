@@ -1,5 +1,7 @@
 # Separate Intuition TESTNET indexer stack (project: intuition-testnet).
 # Does not share DB/volumes/ports with the mainnet `intuition` project.
+# No service restarts on its own (restart: "no"). Kylan, 2026-11-18: "Never restart. Let me
+# restart manually". Start with scripts/start.sh or scripts/start-testnet.sh.
 services:
   database:
     container_name: testnet-database
@@ -42,7 +44,7 @@ services:
     # Without this the worker defaults to `restart: no`. It exited on a transient
     # DB connection error during a database restart and stayed down for two days,
     # silently freezing embeddings while atoms kept indexing.
-    restart: unless-stopped
+    restart: "no"
     environment:
       PGAI_VECTORIZER_WORKER_DB_URL: postgres://postgres:postgres@database:5435/storage
       OPENAI_API_KEY: $OPENAI_API_KEY
@@ -85,7 +87,7 @@ services:
     image: hasura/graphql-engine:v2.48.0
     ports:
       - '8082:8080'
-    restart: always
+    restart: "no"
     environment:
       HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
       HASURA_GRAPHQL_CACHE_DATABASE_URL: postgres://postgres:postgres@database:5435/storage
@@ -109,7 +111,7 @@ services:
   ipfs:
     container_name: testnet-ipfs
     image: ipfs/kubo:latest
-    restart: always
+    restart: "no"
     ports:
       - 4011:4001
       - 5011:5001
