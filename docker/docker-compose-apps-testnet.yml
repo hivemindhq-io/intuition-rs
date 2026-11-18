@@ -1,7 +1,7 @@
 # App services for the SEPARATE Intuition TESTNET indexer (project: intuition-testnet).
 services:
   resolver_consumer:
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
@@ -47,7 +47,7 @@ services:
       replicas: 1
 
   ipfs_upload_consumer:
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
@@ -80,7 +80,7 @@ services:
 
   decoded_consumer:
     container_name: testnet-decoded-consumer
-    image: consumer:local-itemlist
+    image: consumer:local-upstream-2026-11-18
     build:
       context: ..
       dockerfile: apps/consumer/Dockerfile
